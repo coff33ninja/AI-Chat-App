@@ -1,0 +1,15 @@
+{
+  "session_name": "20250130_150712",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello",
+      "timestamp": "2025-01-30T15:06:37.361348"
+    }
+  ],
+  "metadata": {
+    "created_at": "2025-01-30T15:07:12.156036",
+    "message_count": 1,
+    "last_modified": "2025-01-30T15:07:12.156036"
+  }
+}

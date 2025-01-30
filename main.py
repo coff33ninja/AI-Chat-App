@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -11,56 +11,48 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QComboBox,
     QCheckBox,
+    QFrame,
+    QMenuBar,
+    QMenu,
 )
-import subprocess
 import sys
-import re
-import os
+import subprocess
 
-# Optional imports with fallbacks
-try:
-    from TTS.api import TTS
-    COQUI_TTS_AVAILABLE = True
-except ImportError:
-    COQUI_TTS_AVAILABLE = False
+from modules.speech_module import SpeechHandler, PYTTSX3_AVAILABLE, COQUI_TTS_AVAILABLE, STT_AVAILABLE
+from modules.theme_manager import ThemeManager, Theme
+from modules.model_config import ModelConfig
+from modules.logger_config import setup_logging
+from modules.chat_history import ChatHistory
+from modules.shortcut_manager import ShortcutManager
+from modules.tab_manager import TabManager
 
-try:
-    import pyttsx3
-    PYTTSX3_AVAILABLE = True
-except ImportError:
-    PYTTSX3_AVAILABLE = False
-
-try:
-    import whisper
-    WHISPER_MODEL = None  # We'll load it only when needed
-    import sounddevice as sd
-    import numpy as np
-    import wave
-    STT_AVAILABLE = True
-except ImportError:
-    STT_AVAILABLE = False
+# Setup logging
+loggers = setup_logging()
+logger = loggers["main"]
 
 
 class Worker(QThread):
-    """Worker thread for running AI models in a separate thread to avoid blocking the GUI."""
-
+    """Worker thread for running AI models"""
     result_ready = pyqtSignal(str)
 
-    def __init__(self, query: str, model_name: str):
+    def __init__(self, query: str, model_name: str, model_config: ModelConfig):
         super().__init__()
         self.query = query
         self.model_name = model_name
+        self.model_config = model_config
 
     def run(self):
-        """Run the subprocess for the specified AI model and emit the result."""
         try:
-            # First check if ollama is available
+            # Check if ollama is available
             try:
                 subprocess.run(["ollama", "list"], capture_output=True, text=True)
             except FileNotFoundError:
                 self.result_ready.emit("Error: Ollama is not installed or not in PATH. Please install Ollama first.")
                 return
-            
+
+            # Get model parameters
+            params = self.model_config.get_model_parameters(self.model_name)
+
             result = subprocess.run(
                 ["ollama", "run", self.model_name],
                 input=self.query,
@@ -68,18 +60,18 @@ class Worker(QThread):
                 capture_output=True,
                 encoding="utf-8",
             )
-            
+
             if result.returncode != 0:
                 self.result_ready.emit(f"Error: {result.stderr}")
                 return
-                
+
             response = result.stdout.strip()
             if not response:
                 self.result_ready.emit("Error: No response from the model.")
                 return
-                
+
             self.result_ready.emit(response)
-            
+
         except Exception as e:
             self.result_ready.emit(f"Error: {str(e)}")
 
@@ -87,128 +79,229 @@ class Worker(QThread):
 class DeepSeekApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("DeepSeek AI with Speech")
-        self.setGeometry(100, 100, 700, 500)
+        self.setWindowTitle("AI Chat App")
+        self.setGeometry(100, 100, 800, 600)
 
-        # TTS State Variables
-        self.tts_enabled = False
-        self.is_speaking = False
-        self.speech_queue = []
-        
-        # Check available TTS methods
-        tts_methods = []
-        if PYTTSX3_AVAILABLE:
-            tts_methods.append("pyttsx3 (System)")
-        if COQUI_TTS_AVAILABLE:
-            tts_methods.append("Coqui TTS (Local AI)")
-        
+        # Initialize components
+        self.speech_handler = SpeechHandler(self)
+        self.theme_manager = ThemeManager()
+        self.model_config = ModelConfig()
+        self.chat_history = ChatHistory()
+        self.shortcut_manager = ShortcutManager(self)
+
         # Initialize UI
-        self.setup_ui(tts_methods)
+        self.setup_ui()
+        self.setup_menu()
+        self.setup_shortcuts()
+
+        # Apply default theme
+        self.theme_manager.apply_theme(QApplication.instance(), Theme.LIGHT)
         
-    def setup_ui(self, tts_methods):
+        logger.info("Application initialized")
+
+    def setup_menu(self):
+        """Setup the application menu bar"""
+        menubar = self.menuBar()
+
+        # File Menu
+        file_menu = menubar.addMenu("File")
+        new_action = file_menu.addAction("New Chat")
+        new_action.setShortcut("Ctrl+N")
+        new_action.triggered.connect(self.create_new_tab)
+        
+        save_action = file_menu.addAction("Save Chat")
+        save_action.setShortcut("Ctrl+S")
+        save_action.triggered.connect(self.save_current_session)
+
+        # View Menu
+        view_menu = menubar.addMenu("View")
+        theme_action = view_menu.addAction("Toggle Theme")
+        theme_action.setShortcut("Ctrl+T")
+        theme_action.triggered.connect(self.toggle_theme)
+
+        # Settings Menu
+        settings_menu = menubar.addMenu("Settings")
+        model_action = settings_menu.addAction("Model Settings")
+        model_action.triggered.connect(self.show_model_settings)
+        
+        shortcuts_action = settings_menu.addAction("Keyboard Shortcuts")
+        shortcuts_action.triggered.connect(self.show_shortcuts_dialog)
+
+    def setup_ui(self):
         """Setup the UI components"""
         # Central Widget
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
 
-        # Model Selection
-        self.model_dropdown = QComboBox()
-        self.model_dropdown.addItems(["deepseek-r1", "deepseek-coder", "mistral"])
-        self.layout.addWidget(self.model_dropdown)
+        # Top Controls Section
+        self.setup_top_controls()
 
-        # Output Display
+        # Tab Manager
+        self.tab_manager = TabManager(self)
+        self.layout.addWidget(self.tab_manager)
+        
+        # Create initial tab
+        self.create_new_tab()
+
+    def setup_shortcuts(self):
+        """Setup keyboard shortcuts"""
+        self.shortcut_manager.register_shortcut("new_session", self.create_new_tab)
+        self.shortcut_manager.register_shortcut("save_session", self.save_current_session)
+        self.shortcut_manager.register_shortcut("clear_chat", self.clear_current_chat)
+        self.shortcut_manager.register_shortcut("toggle_theme", self.toggle_theme)
+        self.shortcut_manager.register_shortcut("toggle_tts", lambda: self.tts_toggle.setChecked(not self.tts_toggle.isChecked()))
+        self.shortcut_manager.register_shortcut("stop_tts", self.stop_speaking)
+        self.shortcut_manager.register_shortcut("start_stt", self.start_listening)
+
+    def create_new_tab(self):
+        """Create a new chat tab"""
+        model_name = self.model_dropdown.currentText()
+        tab = self.tab_manager.create_new_tab(model_name)
+        return tab
+
+    def save_current_session(self):
+        """Save the current chat session"""
+        current_tab = self.tab_manager.get_current_tab()
+        if current_tab:
+            current_tab.save_session()
+            logger.info("Saved current chat session")
+
+    def clear_current_chat(self):
+        """Clear the current chat tab"""
+        current_tab = self.tab_manager.get_current_tab()
+        if current_tab:
+            current_tab.clear_chat()
+            logger.info("Cleared current chat")
+
+    def show_shortcuts_dialog(self):
+        """Show the keyboard shortcuts configuration dialog"""
+        self.shortcut_manager.show_dialog()
+        logger.debug("Opened shortcuts dialog")
+
+    def setup_top_controls(self):
+        """Setup the top control panel"""
+        top_controls = QFrame()
+        top_controls.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        top_layout = QHBoxLayout(top_controls)
+
+        # Model Selection
+        model_group = QVBoxLayout()
+        model_label = QLabel("AI Model:")
+        self.model_dropdown = QComboBox()
+        self.model_dropdown.addItems(self.model_config.list_available_models())
+        model_group.addWidget(model_label)
+        model_group.addWidget(self.model_dropdown)
+        top_layout.addLayout(model_group)
+
+        # TTS Controls
+        tts_group = QVBoxLayout()
+        tts_methods = self.speech_handler.get_available_tts_methods()
+
+        if tts_methods:
+            self.tts_toggle = QCheckBox("Enable TTS")
+            self.tts_toggle.stateChanged.connect(self.toggle_tts)
+            tts_group.addWidget(self.tts_toggle)
+
+            tts_label = QLabel("TTS Method:")
+            self.tts_dropdown = QComboBox()
+            self.tts_dropdown.addItems(tts_methods)
+            tts_group.addWidget(tts_label)
+            tts_group.addWidget(self.tts_dropdown)
+
+            self.stop_button = QPushButton("Stop Speaking")
+            self.stop_button.clicked.connect(self.stop_speaking)
+            self.stop_button.setEnabled(False)
+            tts_group.addWidget(self.stop_button)
+        else:
+            tts_label = QLabel("TTS not available.\nInstall TTS or pyttsx3.")
+            tts_label.setStyleSheet("color: gray;")
+            tts_group.addWidget(tts_label)
+
+        top_layout.addLayout(tts_group)
+
+        # STT Controls
+        stt_group = QVBoxLayout()
+        if STT_AVAILABLE:
+            stt_label = QLabel("Speech-to-Text:")
+            self.stt_button = QPushButton("🎤 Listen")
+            self.stt_button.clicked.connect(self.start_listening)
+            self.stt_status = QLabel("")
+            self.stt_status.setStyleSheet("color: gray;")
+            stt_group.addWidget(stt_label)
+            stt_group.addWidget(self.stt_button)
+            stt_group.addWidget(self.stt_status)
+        else:
+            stt_label = QLabel("STT not available.\nInstall whisper and\nsounddevice.")
+            stt_label.setStyleSheet("color: gray;")
+            stt_group.addWidget(stt_label)
+
+        top_layout.addLayout(stt_group)
+        self.layout.addWidget(top_controls)
+
+        # Chat Display
         self.output_display = QTextEdit()
         self.output_display.setReadOnly(True)
         self.layout.addWidget(self.output_display)
 
-        # Speaking Status Indicator
+        # Speaking Status
         self.speaking_indicator = QLabel("")
         self.speaking_indicator.setStyleSheet("color: gray;")
         self.layout.addWidget(self.speaking_indicator)
 
-        # Input & Buttons Layout
-        input_layout = QHBoxLayout()
+        # Input Section
+        input_frame = QFrame()
+        input_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        input_layout = QHBoxLayout(input_frame)
+
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Type your query here...")
+        self.input_field.setPlaceholderText("Type your message here...")
         self.input_field.returnPressed.connect(self.handle_query)
         input_layout.addWidget(self.input_field)
 
+        button_layout = QHBoxLayout()
         self.submit_button = QPushButton("Send")
         self.submit_button.clicked.connect(self.handle_query)
-        input_layout.addWidget(self.submit_button)
-
         self.clear_button = QPushButton("Clear")
         self.clear_button.clicked.connect(self.output_display.clear)
-        input_layout.addWidget(self.clear_button)
 
-        self.layout.addLayout(input_layout)
+        button_layout.addWidget(self.submit_button)
+        button_layout.addWidget(self.clear_button)
+        input_layout.addLayout(button_layout)
 
-        # Speech Controls Layout
-        speech_layout = QHBoxLayout()
-
-        if tts_methods:  # Only show TTS controls if methods are available
-            # TTS Enable Toggle
-            self.tts_toggle = QCheckBox("Enable TTS")
-            self.tts_toggle.stateChanged.connect(self.toggle_tts)
-            speech_layout.addWidget(self.tts_toggle)
-
-            # TTS Dropdown
-            self.tts_dropdown = QComboBox()
-            self.tts_dropdown.addItems(tts_methods)
-            speech_layout.addWidget(self.tts_dropdown)
-
-            # Stop Button
-            self.stop_button = QPushButton("Stop Speaking")
-            self.stop_button.clicked.connect(self.stop_speaking)
-            self.stop_button.setEnabled(False)
-            speech_layout.addWidget(self.stop_button)
-        else:
-            # Show message if no TTS methods are available
-            tts_label = QLabel("TTS not available. Install TTS or pyttsx3.")
-            tts_label.setStyleSheet("color: gray;")
-            speech_layout.addWidget(tts_label)
-
-        # Add a spacer to separate TTS and STT controls
-        speech_layout.addStretch()
-
-        # STT Section
-        stt_section = QHBoxLayout()
-        if STT_AVAILABLE:
-            # STT Status Label
-            self.stt_status = QLabel("")
-            self.stt_status.setStyleSheet("color: gray;")
-            stt_section.addWidget(self.stt_status)
-            
-            # STT Button
-            self.stt_button = QPushButton("🎤 Listen (STT)")
-            self.stt_button.clicked.connect(self.start_listening)
-            stt_section.addWidget(self.stt_button)
-        else:
-            # Show message if STT is not available
-            stt_label = QLabel("STT not available. Install whisper and sounddevice.")
-            stt_label.setStyleSheet("color: gray;")
-            stt_section.addWidget(stt_label)
-
-        speech_layout.addLayout(stt_section)
-        self.layout.addLayout(speech_layout)
+        self.layout.addWidget(input_frame)
 
         self.current_worker = None
 
-        if STT_AVAILABLE:
-            # STT Button
-            self.stt_button = QPushButton("🎤 Listen (STT)")
-            self.stt_button.clicked.connect(self.start_listening)
-            speech_layout.addWidget(self.stt_button)
-        else:
-            # Show message if STT is not available
-            stt_label = QLabel("STT not available. Install whisper and sounddevice.")
-            stt_label.setStyleSheet("color: gray;")
-            speech_layout.addWidget(stt_label)
+        # Welcome message
+        self.output_display.append(
+            "Welcome to AI Chat App! Select a model and start chatting."
+        )
+        self.output_display.append(
+            "TIP: Enable TTS to hear responses, or use the microphone for voice input."
+        )
+        self.output_display.append("-" * 50)
 
-        self.layout.addLayout(speech_layout)
+    def toggle_theme(self):
+        """Toggle between light and dark themes"""
+        current_theme = self.theme_manager.current_theme
+        new_theme = Theme.DARK if current_theme == Theme.LIGHT else Theme.LIGHT
+        self.theme_manager.apply_theme(QApplication.instance(), new_theme)
 
-        self.current_worker = None
+    def show_model_settings(self):
+        """Show model settings dialog"""
+        # TODO: Implement model settings dialog
+        model = self.model_dropdown.currentText()
+        info = self.model_config.get_model_info(model)
+        if info:
+            self.output_display.append("\nModel Information:")
+            self.output_display.append(f"Name: {info['name']}")
+            self.output_display.append(f"Description: {info['description']}")
+            self.output_display.append(f"Context Length: {info['context_length']}")
+            self.output_display.append("Parameters:")
+            for k, v in info["parameters"].items():
+                self.output_display.append(f"  {k}: {v}")
+            self.output_display.append("-" * 50)
 
     def toggle_tts(self, state):
         """Toggle TTS functionality"""
@@ -219,238 +312,89 @@ class DeepSeekApp(QMainWindow):
 
     def stop_speaking(self):
         """Stop current TTS output"""
-        self.is_speaking = False
-        self.speech_queue.clear()
+        self.speech_handler.stop_speaking()
         self.speaking_indicator.setText("")
         self.stop_button.setEnabled(False)
-        # Stop the current TTS engine
-        if hasattr(self, 'engine'):
-            try:
-                self.engine.stop()
-            except:
-                pass
 
     def handle_query(self):
-        """Handles the submission of the query and starts the worker thread."""
+        """Handle the submission of a query"""
         query = self.input_field.text().strip()
         if not query:
             return
 
-        model_name = self.model_dropdown.currentText()
-        self.output_display.append(f"Query: {query}")
+        # Clear input field
+        self.input_field.clear()
 
-        self.current_worker = Worker(query, model_name)
-        self.current_worker.result_ready.connect(self.display_result)
+        # Display query
+        self.output_display.append(f"\nYou: {query}")
+
+        # Get selected model
+        model_name = self.model_dropdown.currentText()
+
+        # Start worker thread
+        self.current_worker = Worker(query, model_name, self.model_config)
+        self.current_worker.result_ready.connect(self.handle_response)
         self.current_worker.start()
 
-    def display_result(self, response: str):
-        """Processes and displays the AI response in the output display."""
-        # Remove any unwanted tags or non-text elements
-        response = re.sub(r"<.*?>", "", response).strip()
-
-        if not response:
-            self.output_display.append("AI response is empty or invalid.")
-            return
-
-        if len(response) < 5:
-            self.output_display.append("AI response is too short or not meaningful.")
-            return
-
-        # Display the result
-        self.output_display.append(f"AI: {response}")
+    def handle_response(self, response: str):
+        """Handle the AI response"""
+        self.output_display.append(f"\nAI: {response}")
 
         # Handle TTS if enabled
-        if self.tts_enabled and not self.is_speaking:
-            self.text_to_speech(response)
-        elif self.tts_enabled:
-            self.speech_queue.append(response)
+        if hasattr(self, "tts_enabled") and self.tts_enabled:
+            if not self.speech_handler.is_speaking:
+                self.speaking_indicator.setText("🔊 AI is speaking...")
+                self.stop_button.setEnabled(True)
 
-    def text_to_speech(self, text):
-        """Enhanced TTS function with visual feedback"""
-        if not self.tts_enabled or not text or len(text.strip()) < 5:
-            return
+                def tts_callback(error=None):
+                    self.speaking_indicator.setText("")
+                    self.stop_button.setEnabled(False)
+                    if error:
+                        self.output_display.append(f"TTS Error: {error}")
 
-        self.is_speaking = True
-        self.speaking_indicator.setText("🔊 AI is speaking...")
-        self.stop_button.setEnabled(True)
-
-        # Clean the text
-        text = re.sub(r"<.*?>", "", text).strip()
-
-        try:
-            method = self.tts_dropdown.currentText()
-            if method == "pyttsx3 (System)" and PYTTSX3_AVAILABLE:
-                self.engine = pyttsx3.init()
-                self.engine.say(text)
-                self.engine.runAndWait()
-            elif method == "Coqui TTS (Local AI)" and COQUI_TTS_AVAILABLE:
-                self.coqui_tts(text)
+                self.speech_handler.text_to_speech(
+                    response, self.tts_dropdown.currentText(), callback=tts_callback
+                )
             else:
-                raise Exception("Selected TTS method is not available")
-
-            # Process next in queue if any
-            if self.speech_queue and self.tts_enabled:
-                next_text = self.speech_queue.pop(0)
-                QTimer.singleShot(500, lambda: self.text_to_speech(next_text))
-            else:
-                self.is_speaking = False
-                self.speaking_indicator.setText("")
-                self.stop_button.setEnabled(False)
-
-        except Exception as e:
-            self.output_display.append(f"TTS Error: {str(e)}")
-            self.is_speaking = False
-            self.speaking_indicator.setText("")
-            self.stop_button.setEnabled(False)
+                self.speech_handler.speech_queue.append(response)
 
     def start_listening(self):
-        """Records audio and converts it to text using the Whisper model."""
-        if not STT_AVAILABLE:
-            self.output_display.append("Error: Speech-to-Text is not available. Please install whisper and sounddevice.")
-            return
+        """Start STT recording"""
+        self.stt_button.setEnabled(False)
+        self.stt_status.setText("Listening...")
 
-        try:
-            samplerate = 16000
-            duration = 5  # seconds
-            filename = "stt_record.wav"
-
-            self.output_display.append("Listening...")
-            self.stt_button.setEnabled(False)  # Disable button while recording
-            QApplication.processEvents()  # Update UI
-
-            # Record audio
-            audio_data = sd.rec(
-                int(samplerate * duration),
-                samplerate=samplerate,
-                channels=1,
-                dtype=np.int16,
-            )
-            sd.wait()
-
-            # Save to WAV file
-            with wave.open(filename, "wb") as wavefile:
-                wavefile.setnchannels(1)
-                wavefile.setsampwidth(2)
-                wavefile.setframerate(samplerate)
-                wavefile.writeframes(audio_data.tobytes())
-
-            self.output_display.append("Processing speech...")
-            QApplication.processEvents()  # Update UI
-
-            # Load model only when needed
-            global WHISPER_MODEL
-            if WHISPER_MODEL is None:
-                self.output_display.append("Loading Whisper model (first time only)...")
-                QApplication.processEvents()
-                WHISPER_MODEL = whisper.load_model("base")
-
-            # Transcribe
-            result = WHISPER_MODEL.transcribe(filename)
-            transcribed_text = result["text"].strip()
-
-            if transcribed_text:
-                self.input_field.setText(transcribed_text)
-                self.output_display.append(f"Transcribed: {transcribed_text}")
-            else:
-                self.output_display.append("No speech detected.")
-
-        except Exception as e:
-            self.output_display.append(f"Error during speech recognition: {str(e)}")
-        finally:
-            if os.path.exists(filename):
-                try:
-                    os.remove(filename)
-                except:
-                    pass
+        def stt_callback(text=None, status=None, error=None):
+            if status:
+                self.stt_status.setText(status)
+            if text:
+                self.input_field.setText(text)
+                self.stt_status.setText("Ready")
+            if error:
+                self.output_display.append(f"STT Error: {error}")
+                self.stt_status.setText("Ready")
             self.stt_button.setEnabled(True)
-            self.output_display.append("Ready.")
 
-    def keyPressEvent(self, event):
-        """Handle key press events"""
-        if event.key() == Qt.Key.Key_Return:
-            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
-                # Shift+Enter: New line
-                cursor = self.input_field.textCursor()
-                cursor.insertText('\n')
-            else:
-                # Enter: Send message
-                self.handle_query()
-        else:
-            super().keyPressEvent(event)
-
-    def text_to_speech(self, text=None):
-        """Converts text to speech using the selected method in the dropdown."""
-        # If text is None, get it from the input field (human input)
-        if text is None:
-            text = self.input_field.text().strip()  # Get text from the input field
-
-        print(f"Debug: Text to convert: '{text}'")  # Debug statement
-        method = self.tts_dropdown.currentText()  # Ensure method is defined
-        print(f"Debug: Selected TTS method: {method}")  # Debug statement
-        if not text or len(text.strip()) < 5 or getattr(self, 'tts_running', False):
-            self.output_display.append("No valid text to convert.")
-            print(f"Debug: No valid text to convert. Text: '{text}'")
-            return
-
-        # Remove any unwanted tags or non-text elements
-        text = re.sub(r"<.*?>", "", text).strip()
-
-        if not text:
-            self.output_display.append("No text to convert.")
-            print(f"Debug: No text after cleaning. Text: '{text}'")
-            return
-
-        # Check if the text is too short for TTS
-        if len(text.strip()) < 5:  # Adjust length threshold as necessary
-            self.output_display.append("Text is too short for TTS.")
-            return
-
-        method = self.tts_dropdown.currentText()
-
-        try:
-            if method == "pyttsx3 (System)":
-                engine = pyttsx3.init()
-                engine.say(text)
-                print("Debug: TTS engine initialized, speaking...")  # Debug statement
-                engine.runAndWait()
-                print("Debug: TTS finished speaking.")  # Debug statement
-
-            elif method == "Coqui TTS (Local AI)":
-                print("Debug: Triggering Coqui TTS method.")
-                self.coqui_tts(text)
-
-        except Exception as e:
-            self.output_display.append(f"Failed to use TTS: {str(e)}")
-
-    def coqui_tts(self, text):
-        try:
-            model = TTS("tts_models/en/ljspeech/glow-tts").to("cpu")
-            file_path = "output.wav"
-            print(
-                f"Debug: Length of input text: {len(text)}"
-            )  # Log the length of the input text
-            if len(text) < 5:  # Ensure the text is long enough for TTS
-                raise ValueError("Input text is too short for TTS.")
-            model.tts_to_file(text, file_path=file_path)
-            print(f"Debug: TTS output saved to {file_path}.")
-            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                print("Debug: Audio file created successfully and is not empty.")
-            else:
-                print("Debug: Audio file was not created or is empty.")
-            subprocess.run(["ffplay", "-nodisp", "-autoexit", "output.wav"])
-            os.remove("output.wav")
-        except Exception as e:
-            self.output_display.append(f"Failed to use Coqui TTS: {str(e)}")
+        self.speech_handler.start_listening(callback=stt_callback)
 
     def closeEvent(self, event):
-        """Override closeEvent to handle thread cleanup properly."""
-        if self.current_worker and self.current_worker.isRunning():
-            print("Waiting for worker thread to finish...")
-            self.current_worker.quit()  # Ask the worker to finish
-            self.current_worker.wait()  # Ensure the worker finishes before closing the window
-            print("Worker thread finished.")
+        """Clean up before closing"""
+        reply = QMessageBox.question(
+            self,
+            "Save Sessions",
+            "Would you like to save all chat sessions before closing?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
 
+        if reply == QMessageBox.StandardButton.Yes:
+            self.tab_manager.save_all_sessions()
+
+        if self.current_worker and self.current_worker.isRunning():
+            self.current_worker.quit()
+            self.current_worker.wait()
+        self.stop_speaking()  # Stop any ongoing TTS
         event.accept()
+        
+        logger.info("Application closing")
 
 
 if __name__ == "__main__":

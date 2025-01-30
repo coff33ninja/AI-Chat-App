@@ -1,6 +1,16 @@
 PyQt6>=6.0.0
+PyQt6-tools>=6.0.0
+PyQt6[full]
 pyttsx3>=2.90
 openai-whisper>=20231117
 sounddevice>=0.4.6
 numpy>=1.24.0
 TTS>=0.22.0  # Optional: for Coqui TTS
+wave>=0.0.2
+openai>=1.0.0
+requests>=2.31.0
+pyaudio>=0.2.13
+scipy>=1.11.0
+python-dotenv>=1.0.0
+qt-material>=2.14  # Optional: for better UI themes
+regex>=2023.10.3

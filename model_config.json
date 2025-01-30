@@ -1,0 +1,38 @@
+{
+    "deepseek-coder": {
+        "name": "deepseek-coder",
+        "description": "Code-specialized model",
+        "context_length": 8192,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95
+        }
+    },
+    "deepseek-r1": {
+        "name": "deepseek-r1",
+        "description": "General purpose model",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95
+        }
+    },
+    "mistral": {
+        "name": "mistral",
+        "description": "Balanced model",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95
+        }
+    },
+    "llama2": {
+        "name": "llama2",
+        "description": "General purpose model",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95
+        }
+    }
+}

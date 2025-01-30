@@ -1,0 +1,94 @@
+from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import QWidget, QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton
+from typing import Dict, Callable
+import json
+import os
+
+class ShortcutManager:
+    def __init__(self, parent: QWidget):
+        self.parent = parent
+        self.shortcuts: Dict[str, QShortcut] = {}
+        self.default_shortcuts = {
+            "new_session": "Ctrl+N",
+            "save_session": "Ctrl+S",
+            "load_session": "Ctrl+O",
+            "export_session": "Ctrl+E",
+            "toggle_theme": "Ctrl+T",
+            "settings": "Ctrl+,",
+            "clear_chat": "Ctrl+L",
+            "focus_input": "Ctrl+I",
+            "stop_tts": "Ctrl+.",
+            "toggle_tts": "Ctrl+Alt+T",
+            "start_stt": "Ctrl+M"
+        }
+        self.load_shortcuts()
+
+    def load_shortcuts(self):
+        """Load shortcuts from settings file"""
+        settings = QSettings("AI-Chat-App", "Shortcuts")
+        shortcuts_data = settings.value("shortcuts", {})
+        
+        # Use defaults for missing shortcuts
+        self.current_shortcuts = self.default_shortcuts.copy()
+        self.current_shortcuts.update(shortcuts_data)
+
+    def save_shortcuts(self):
+        """Save shortcuts to settings file"""
+        settings = QSettings("AI-Chat-App", "Shortcuts")
+        settings.setValue("shortcuts", self.current_shortcuts)
+
+    def register_shortcut(self, action_name: str, callback: Callable):
+        """Register a new shortcut"""
+        if action_name in self.current_shortcuts:
+            shortcut = QShortcut(QKeySequence(self.current_shortcuts[action_name]), self.parent)
+            shortcut.activated.connect(callback)
+            self.shortcuts[action_name] = shortcut
+
+    def update_shortcut(self, action_name: str, new_sequence: str):
+        """Update existing shortcut"""
+        if action_name in self.shortcuts:
+            self.current_shortcuts[action_name] = new_sequence
+            self.shortcuts[action_name].setKey(QKeySequence(new_sequence))
+            self.save_shortcuts()
+
+    def reset_to_defaults(self):
+        """Reset all shortcuts to default values"""
+        self.current_shortcuts = self.default_shortcuts.copy()
+        for action_name, shortcut in self.shortcuts.items():
+            shortcut.setKey(QKeySequence(self.default_shortcuts[action_name]))
+        self.save_shortcuts()
+
+class ShortcutDialog(QDialog):
+    def __init__(self, shortcut_manager: ShortcutManager, parent=None):
+        super().__init__(parent)
+        self.shortcut_manager = shortcut_manager
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.setWindowTitle("Keyboard Shortcuts")
+        layout = QVBoxLayout(self)
+
+        # Create table
+        self.table = QTableWidget()
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Action", "Shortcut"])
+        
+        # Populate table
+        self.table.setRowCount(len(self.shortcut_manager.current_shortcuts))
+        for i, (action, shortcut) in enumerate(self.shortcut_manager.current_shortcuts.items()):
+            action_item = QTableWidgetItem(action.replace("_", " ").title())
+            shortcut_item = QTableWidgetItem(shortcut)
+            self.table.setItem(i, 0, action_item)
+            self.table.setItem(i, 1, shortcut_item)
+
+        layout.addWidget(self.table)
+
+        # Reset button
+        reset_button = QPushButton("Reset to Defaults")
+        reset_button.clicked.connect(self.reset_shortcuts)
+        layout.addWidget(reset_button)
+
+    def reset_shortcuts(self):
+        self.shortcut_manager.reset_to_defaults()
+        self.close()
