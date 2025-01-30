@@ -1,0 +1,20 @@
+{
+    "name": "check_deps",
+    "command": "python check_deps.py",
+    "cwd": "${workspace}",
+    "shell": true,
+    "variants": [
+        {
+            "name": "Install Dependencies",
+            "command": "python check_deps.py --install"
+        },
+        {
+            "name": "Check Speech Module",
+            "command": "python check_deps.py --module speech_module"
+        },
+        {
+            "name": "Install Speech Module Dependencies",
+            "command": "python check_deps.py --module speech_module --install"
+        }
+    ]
+}

@@ -8,14 +8,14 @@ import numpy as np
 # Optional imports with fallbacks
 try:
     from TTS.api import TTS
-
+    import pkg_resources
+    tts_version = pkg_resources.get_distribution('TTS').version
     COQUI_TTS_AVAILABLE = True
 except ImportError:
     COQUI_TTS_AVAILABLE = False
 
 try:
     import pyttsx3
-
     PYTTSX3_AVAILABLE = True
 except ImportError:
     PYTTSX3_AVAILABLE = False
@@ -23,7 +23,6 @@ except ImportError:
 try:
     import whisper
     import sounddevice as sd
-
     WHISPER_MODEL = None
     STT_AVAILABLE = True
 except ImportError:
@@ -36,6 +35,21 @@ class SpeechHandler:
         self.is_speaking = False
         self.speech_queue = []
         self.engine = None
+        self.tts_model = None
+        self.output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+    def _init_tts_model(self):
+        """Lazy initialization of TTS model"""
+        if not self.tts_model and COQUI_TTS_AVAILABLE:
+            try:
+                self.tts_model = TTS("tts_models/en/ljspeech/glow-tts")
+                self.tts_model.to("cpu")
+            except Exception as e:
+                print(f"Failed to initialize Coqui TTS model: {str(e)}")
+                return False
+        return True
 
     def get_available_tts_methods(self):
         """Returns a list of available TTS methods"""
@@ -62,6 +76,8 @@ class SpeechHandler:
                 self.engine.say(text)
                 self.engine.runAndWait()
             elif method == "Coqui TTS (Local AI)" and COQUI_TTS_AVAILABLE:
+                if not self._init_tts_model():
+                    raise Exception("Failed to initialize TTS model")
                 self._coqui_tts(text)
             else:
                 raise Exception("Selected TTS method is not available")
@@ -87,14 +103,37 @@ class SpeechHandler:
 
     def _coqui_tts(self, text):
         """Internal method to handle Coqui TTS"""
+        file_path = os.path.join(self.output_dir, "output.wav")
         try:
-            model = TTS("tts_models/en/ljspeech/glow-tts").to("cpu")
-            file_path = "output.wav"
-            model.tts_to_file(text, file_path=file_path)
-            subprocess.run(["ffplay", "-nodisp", "-autoexit", file_path])
-            os.remove(file_path)
+            if self.tts_model is None:
+                raise Exception("TTS model not initialized")
+                
+            self.tts_model.tts_to_file(text, file_path=file_path)
+            subprocess.run(["ffplay", "-nodisp", "-autoexit", file_path], 
+                         check=True, 
+                         stderr=subprocess.DEVNULL, 
+                         stdout=subprocess.DEVNULL)
+        except subprocess.CalledProcessError:
+            raise Exception("Failed to play audio file")
         except Exception as e:
             raise Exception(f"Failed to use Coqui TTS: {str(e)}")
+        finally:
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+
+    def __del__(self):
+        """Cleanup resources"""
+        self.stop_speaking()
+        if os.path.exists(self.output_dir):
+            try:
+                for file in os.listdir(self.output_dir):
+                    os.remove(os.path.join(self.output_dir, file))
+                os.rmdir(self.output_dir)
+            except:
+                pass
 
     def stop_speaking(self):
         """Stop current TTS output"""
