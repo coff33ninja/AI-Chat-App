@@ -53,7 +53,7 @@ The PowerShell installation script provides:
    - Automatic environment variable updates
 
 2. **Core Components Installation**
-   - Python 3.10
+   - Python 3.11
    - Git
    - FFmpeg
    - Ollama
