@@ -99,7 +99,7 @@ class Worker(QThread):
             self.result_ready.emit(error_msg)
 
 
-class DeepSeekApp(QMainWindow):
+class AIChatApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AI Chat App")

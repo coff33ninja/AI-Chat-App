@@ -193,4 +193,44 @@ else
     fi
 fi
 
+# Function to create desktop shortcut and application menu entry
+create_desktop_shortcut() {
+    echo "Creating desktop shortcut and application menu entry..."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Create macOS application shortcut
+        SHORTCUT_DIR="$HOME/Applications"
+        mkdir -p "$SHORTCUT_DIR"
+        ln -sf "$HOME/AI-Chat-App/run_app.py" "$SHORTCUT_DIR/AI Chat App"
+        chmod +x "$SHORTCUT_DIR/AI Chat App"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Create Linux desktop entry
+        DESKTOP_FILE="$HOME/.local/share/applications/ai-chat-app.desktop"
+        DESKTOP_SHORTCUT="$HOME/Desktop/ai-chat-app.desktop"
+        
+        # Create the desktop entry content
+        cat << EOF > "$DESKTOP_FILE"
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AI Chat App
+Comment=AI Chat Application
+Exec=python3 $HOME/AI-Chat-App/run_app.py
+Terminal=false
+Categories=Utility;
+EOF
+        
+        # Make it executable
+        chmod +x "$DESKTOP_FILE"
+        
+        # Create desktop shortcut
+        ln -sf "$DESKTOP_FILE" "$DESKTOP_SHORTCUT"
+        
+        # Update desktop database
+        update-desktop-database "$HOME/.local/share/applications"
+    fi
+}
+
+# Create desktop shortcut and menu entry
+create_desktop_shortcut
+
 echo "Setup complete! The application should now be running in a new window."

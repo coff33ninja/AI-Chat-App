@@ -131,6 +131,17 @@ if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
 
 # Launch post-install script in a new window
 Write-Host "Launching environment setup in a new window..." -ForegroundColor Yellow
+
+Create desktop shortcut
+Write-Host "Creating desktop shortcut..." -ForegroundColor Green
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\AI-Chat-App.lnk")
+$Shortcut.TargetPath = "$PWD\.venv\Scripts\python.exe"
+$Shortcut.Arguments = "$PWD\main.py"
+$Shortcut.WorkingDirectory = "$PWD\.venv\Scripts"
+$Shortcut.Save()
+Write-Host "Desktop shortcut created successfully!" -ForegroundColor Green
+
 Start-Process powershell.exe -ArgumentList "-NoExit -ExecutionPolicy Bypass -File `"$postInstallPath`"" -Wait
 
 Write-Host "Setup complete! The application should now be running in a new window." -ForegroundColor Green
