@@ -81,7 +81,7 @@ The shell installation script provides:
    - Automatic dependency resolution
 
 2. **Core Components Installation**
-   - Python 3.10 (with version checking)
+   - Python 3.11 (with version checking)
    - Git
    - FFmpeg
    - Ollama
