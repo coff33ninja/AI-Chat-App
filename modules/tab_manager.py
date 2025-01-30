@@ -9,12 +9,16 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 from datetime import datetime
+import logging
 from .model_config import ModelConfig
 
 
 class TabManager(QTabWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.logger = logging.getLogger("main.tab_manager")
+        self.logger.info("Initializing TabManager")
+        
         self.parent = parent
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.close_tab)
@@ -23,12 +27,15 @@ class TabManager(QTabWidget):
 
     def initialize_model_tabs(self):
         """Create initial tabs for each installed model"""
+        self.logger.info("Initializing model tabs")
         available_models = self.model_config.list_available_models()
         for model in available_models:
             self.create_model_tab(model)
+        self.logger.info(f"Created {len(available_models)} model tabs")
 
     def create_model_tab(self, model_name):
         """Create a new tab for a specific model"""
+        self.logger.info(f"Creating new tab for model: {model_name}")
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
@@ -75,39 +82,47 @@ class TabManager(QTabWidget):
 
         # Add tab
         self.addTab(tab, model_name)
+        self.logger.debug(f"Tab created successfully for model: {model_name}")
         return tab
 
     def handle_query(self, tab):
         """Handle query from the current tab"""
         query = tab.input_field.text().strip()
         if not query:
+            self.logger.debug("Empty query received, ignoring")
             return
 
         # Clear input field
         tab.input_field.clear()
 
-        # Display query
-        tab.output_display.append(f"\nYou: {query}")
-
         # Get model name from tab text
         model_name = self.tabText(self.indexOf(tab))
+        self.logger.info(f"Processing query for model {model_name}: {query[:50]}...")
+
+        # Display query
+        tab.output_display.append(f"\nYou: {query}")
 
         # Start worker thread
         from main import Worker  # Import here to avoid circular import
         worker = Worker(query, model_name, self.model_config)
         worker.result_ready.connect(lambda response: self.handle_response(tab, response))
         worker.start()
+        self.logger.debug(f"Started worker thread for model {model_name}")
 
         # Store worker reference to prevent garbage collection
         tab.current_worker = worker
 
     def handle_response(self, tab, response: str):
         """Handle AI response in the current tab"""
+        model_name = self.tabText(self.indexOf(tab))
+        self.logger.info(f"Received response from model {model_name}: {response[:50]}...")
+        
         tab.output_display.append(f"\nAI: {response}")
 
         # Handle TTS if enabled
         if hasattr(self.parent, "tts_enabled") and self.parent.tts_enabled:
             if not self.parent.speech_handler.is_speaking:
+                self.logger.debug("Initiating text-to-speech for response")
                 self.parent.speaking_indicator.setText("🔊 AI is speaking...")
                 self.parent.stop_button.setEnabled(True)
 
@@ -115,6 +130,7 @@ class TabManager(QTabWidget):
                     self.parent.speaking_indicator.setText("")
                     self.parent.stop_button.setEnabled(False)
                     if error:
+                        self.logger.error(f"TTS error: {error}")
                         tab.output_display.append(f"TTS Error: {error}")
 
                 self.parent.speech_handler.text_to_speech(
@@ -123,14 +139,18 @@ class TabManager(QTabWidget):
                     callback=tts_callback
                 )
             else:
+                self.logger.debug("Adding response to speech queue")
                 self.parent.speech_handler.speech_queue.append(response)
 
     def close_tab(self, index):
         """Close the specified tab"""
         tab = self.widget(index)
+        model_name = self.tabText(index)
+        self.logger.info(f"Closing tab for model: {model_name}")
         
         # Stop any running worker
         if hasattr(tab, 'current_worker') and tab.current_worker:
+            self.logger.debug(f"Stopping worker thread for model: {model_name}")
             tab.current_worker.quit()
             tab.current_worker.wait()
         
@@ -139,14 +159,20 @@ class TabManager(QTabWidget):
         # Don't allow closing the last tab
         if self.count() == 0:
             model_name = self.model_config.list_available_models()[0]
+            self.logger.info(f"Creating default tab for model: {model_name}")
             self.create_model_tab(model_name)
 
     def get_current_tab(self):
         """Get the currently active tab"""
-        return self.currentWidget()
+        current_tab = self.currentWidget()
+        if current_tab:
+            model_name = self.tabText(self.currentIndex())
+            self.logger.debug(f"Current active tab: {model_name}")
+        return current_tab
 
     def save_all_sessions(self):
         """Save chat history from all tabs"""
+        self.logger.info("Saving all chat sessions")
         for i in range(self.count()):
             tab = self.widget(i)
             model_name = self.tabText(i)
@@ -159,5 +185,6 @@ class TabManager(QTabWidget):
             try:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(chat_text)
+                self.logger.info(f"Saved chat session for model {model_name} to {filename}")
             except Exception as e:
-                print(f"Error saving chat session: {e}")
+                self.logger.error(f"Error saving chat session for model {model_name}: {str(e)}")

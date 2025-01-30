@@ -1,6 +1,6 @@
 # AI Chat App
 
-A desktop application for interacting with various AI models, featuring text-to-speech, speech-to-text, and multi-session support.
+A sophisticated chat application that leverages AI models through Ollama integration, featuring a modern PyQt6 interface with support for text-to-speech and speech-to-text capabilities.
 
 ## 🚧 Work in Progress
 
@@ -38,75 +38,179 @@ This project is actively under development. Current features and upcoming plans 
    - Chat session sharing
    - Advanced export options
 
-## Installation
+## Installation Scripts
 
-### Prerequisites
+The application provides robust installation scripts for both Windows and Unix-like systems (Linux/macOS):
 
-- Python 3.8 or higher
-- Ollama (for AI model support)
-- Qt6 (installed automatically with requirements)
+### Windows Installation (install.ps1)
 
-### Optional Dependencies
+The PowerShell installation script provides:
 
-- pyttsx3 (for basic TTS)
-- Coqui TTS (for enhanced TTS)
-- OpenAI Whisper (for STT)
-- sounddevice (for STT)
+1. **Package Management**
+   - Installs Chocolatey if not present
+   - Uses Chocolatey to install winget-cli
+   - Fallback mechanisms: winget → Chocolatey for package installations
+   - Automatic environment variable updates
 
-### Setup
+2. **Core Components Installation**
+   - Python 3.10
+   - Git
+   - FFmpeg
+   - Ollama
+
+3. **Environment Setup**
+   - Creates isolated virtual environment
+   - Handles environment variables
+   - Manages dependencies in a separate terminal
+   - Automatic post-install configuration
+
+4. **Error Handling**
+   - Administrator privilege checks
+   - Package installation verification
+   - Fallback mechanisms for failed installations
+   - Detailed error logging
+
+### Linux/macOS Installation (install.sh)
+
+The shell installation script provides:
+
+1. **Package Management**
+   - Debian/Ubuntu: Installs and uses nala (with apt fallback)
+   - macOS: Uses Homebrew
+   - Intelligent package manager detection and selection
+   - Automatic dependency resolution
+
+2. **Core Components Installation**
+   - Python 3.10 (with version checking)
+   - Git
+   - FFmpeg
+   - Ollama
+
+3. **Environment Setup**
+   - Creates Python virtual environment
+   - Handles terminal-specific launching
+   - OS-specific package management
+   - Permission handling
+
+Both scripts feature:
+- Automatic dependency resolution
+- Error handling and fallback mechanisms
+- Separate post-install environment setup
+- Automatic Ollama model pulling (deepseek-coder, deepseek-r1, mistral)
+- Comprehensive logging
+- Platform-specific optimizations
+
+## Project Structure
+
+### Core Components
+
+1. **User Interface (PyQt6)**
+   - `modules/tab_manager.py`: Manages chat tabs and sessions
+   - `modules/chat_interface.py`: Main chat interface implementation
+   - `modules/settings_dialog.py`: Application settings management
+
+2. **AI Integration**
+   - `modules/ai_handler.py`: Manages AI model interactions
+   - `modules/model_config.py`: AI model configuration
+   - `modules/ollama_interface.py`: Ollama API integration
+
+3. **Speech Features**
+   - `modules/tts_manager.py`: Text-to-speech functionality
+   - `modules/stt_manager.py`: Speech-to-text processing
+   - `modules/audio_utils.py`: Audio processing utilities
+
+4. **System Components**
+   - `run_app.py`: Main application entry point
+   - `dependency_manager.py`: Dependency management system
+   - `utils/logger.py`: Logging system implementation
+
+### Features
+
+1. **Chat Management**
+   - Multiple chat sessions
+   - Session persistence
+   - Chat history management
+   - Context handling
+
+2. **AI Capabilities**
+   - Multiple model support
+   - Context-aware responses
+   - Model switching
+   - Parameter customization
+
+3. **Speech Processing**
+   - Text-to-speech output
+   - Speech-to-text input
+   - Voice command support
+   - Multiple TTS engine support
+
+4. **User Interface**
+   - Dark/Light theme support
+   - Customizable shortcuts
+   - Responsive design
+   - Tab-based interface
+
+## Dependencies
+
+### Core Requirements
+- Python 3.10 or higher
+- PyQt6
+- Ollama
+- FFmpeg
+
+### Additional Features
+- pyttsx3 (basic TTS)
+- Coqui TTS (enhanced TTS)
+- OpenAI Whisper (STT)
+- sounddevice (audio I/O)
+
+## Quick Start
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/AI-Chat-App.git
+git clone https://github.com/coff33ninja/AI-Chat-App.git
 cd AI-Chat-App
 ```
 
-2. Install dependencies:
+2. Run the installation script:
 
-On Windows:
-```bash
+Windows:
+```powershell
 .\install.ps1
 ```
 
-On Linux/Mac:
+Linux/macOS:
 ```bash
+chmod +x install.sh
 ./install.sh
 ```
 
-Or manually:
-```bash
-pip install -r requirements.txt
-```
+The installation scripts will:
+- Install required package managers
+- Set up necessary dependencies
+- Create a Python virtual environment
+- Pull required Ollama models
+- Launch the application
 
-3. Run the application:
-```bash
-python main.py
-```
+## Development
 
-## Usage
+### Logging System
 
-1. **Starting a Chat**
-   - Select an AI model from the dropdown
-   - Click "New Chat" or use Ctrl+N
-   - Type your message and press Enter or click Send
+The application includes comprehensive logging:
 
-2. **Using Voice Features**
-   - Enable TTS by checking "Enable TTS"
-   - Click the microphone button for voice input (if available)
+1. **Categories**
+   - Model operations
+   - User interactions
+   - System events
+   - Error tracking
 
-3. **Managing Sessions**
-   - Save current session: Ctrl+S
-   - Clear chat: Ctrl+L
-   - Switch between tabs for different conversations
+2. **Log Levels**
+   - DEBUG: Development details
+   - INFO: General operations
+   - WARNING: Non-critical issues
+   - ERROR: Critical problems
 
-4. **Customization**
-   - Toggle theme: Ctrl+T
-   - Configure shortcuts: Settings → Keyboard Shortcuts
-   - Adjust model settings: Settings → Model Settings
-
-## Contributing
-
-This project is open for contributions. Please feel free to submit issues, fork the repository and create pull requests for any improvements.
+### Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -120,6 +224,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Thanks to all contributors and users
 - Built with PyQt6
-- Uses Ollama for AI model integration
+- Uses Ollama for AI integration
+- Inspired by modern chat applications

@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 import sys
 import subprocess
+import logging
 from datetime import datetime
 
 from modules.speech_module import SpeechHandler, PYTTSX3_AVAILABLE, COQUI_TTS_AVAILABLE, STT_AVAILABLE
@@ -42,19 +43,31 @@ class Worker(QThread):
         self.query = query
         self.model_name = model_name
         self.model_config = model_config
+        self.logger = logging.getLogger("main.worker")
+        self.logger.info(f"Worker initialized for model: {model_name}")
 
     def run(self):
         try:
             # Check if ollama is available
+            self.logger.debug("Checking Ollama availability...")
             try:
                 subprocess.run(["ollama", "list"], capture_output=True, text=True)
+                self.logger.info("Ollama is available")
             except FileNotFoundError:
-                self.result_ready.emit("Error: Ollama is not installed or not in PATH. Please install Ollama first.")
+                error_msg = "Error: Ollama is not installed or not in PATH. Please install Ollama first."
+                self.logger.error(error_msg)
+                self.result_ready.emit(error_msg)
                 return
 
             # Get model parameters
+            self.logger.debug(f"Getting parameters for model: {self.model_name}")
             params = self.model_config.get_model_parameters(self.model_name)
+            self.logger.debug(f"Model parameters: {params}")
 
+            # Execute model query
+            self.logger.info(f"Executing query with model {self.model_name}")
+            self.logger.debug(f"Query text: {self.query[:100]}...")  # Log first 100 chars
+            
             result = subprocess.run(
                 ["ollama", "run", self.model_name],
                 input=self.query,
@@ -64,18 +77,26 @@ class Worker(QThread):
             )
 
             if result.returncode != 0:
-                self.result_ready.emit(f"Error: {result.stderr}")
+                error_msg = f"Error: {result.stderr}"
+                self.logger.error(f"Model execution failed: {error_msg}")
+                self.result_ready.emit(error_msg)
                 return
 
             response = result.stdout.strip()
             if not response:
-                self.result_ready.emit("Error: No response from the model.")
+                error_msg = "Error: No response from the model."
+                self.logger.error(error_msg)
+                self.result_ready.emit(error_msg)
                 return
 
+            self.logger.info("Successfully generated response")
+            self.logger.debug(f"Response length: {len(response)} characters")
             self.result_ready.emit(response)
 
         except Exception as e:
-            self.result_ready.emit(f"Error: {str(e)}")
+            error_msg = f"Error: {str(e)}"
+            self.logger.error(f"Unexpected error in worker thread: {str(e)}", exc_info=True)
+            self.result_ready.emit(error_msg)
 
 
 class DeepSeekApp(QMainWindow):
