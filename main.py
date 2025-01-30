@@ -14,9 +14,11 @@ from PyQt6.QtWidgets import (
     QFrame,
     QMenuBar,
     QMenu,
+    QMessageBox,
 )
 import sys
 import subprocess
+from datetime import datetime
 
 from modules.speech_module import SpeechHandler, PYTTSX3_AVAILABLE, COQUI_TTS_AVAILABLE, STT_AVAILABLE
 from modules.theme_manager import ThemeManager, Theme
@@ -140,9 +142,6 @@ class DeepSeekApp(QMainWindow):
         # Tab Manager
         self.tab_manager = TabManager(self)
         self.layout.addWidget(self.tab_manager)
-        
-        # Create initial tab
-        self.create_new_tab()
 
     def setup_shortcuts(self):
         """Setup keyboard shortcuts"""
@@ -154,45 +153,11 @@ class DeepSeekApp(QMainWindow):
         self.shortcut_manager.register_shortcut("stop_tts", self.stop_speaking)
         self.shortcut_manager.register_shortcut("start_stt", self.start_listening)
 
-    def create_new_tab(self):
-        """Create a new chat tab"""
-        model_name = self.model_dropdown.currentText()
-        tab = self.tab_manager.create_new_tab(model_name)
-        return tab
-
-    def save_current_session(self):
-        """Save the current chat session"""
-        current_tab = self.tab_manager.get_current_tab()
-        if current_tab:
-            current_tab.save_session()
-            logger.info("Saved current chat session")
-
-    def clear_current_chat(self):
-        """Clear the current chat tab"""
-        current_tab = self.tab_manager.get_current_tab()
-        if current_tab:
-            current_tab.clear_chat()
-            logger.info("Cleared current chat")
-
-    def show_shortcuts_dialog(self):
-        """Show the keyboard shortcuts configuration dialog"""
-        self.shortcut_manager.show_dialog()
-        logger.debug("Opened shortcuts dialog")
-
     def setup_top_controls(self):
         """Setup the top control panel"""
         top_controls = QFrame()
         top_controls.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         top_layout = QHBoxLayout(top_controls)
-
-        # Model Selection
-        model_group = QVBoxLayout()
-        model_label = QLabel("AI Model:")
-        self.model_dropdown = QComboBox()
-        self.model_dropdown.addItems(self.model_config.list_available_models())
-        model_group.addWidget(model_label)
-        model_group.addWidget(self.model_dropdown)
-        top_layout.addLayout(model_group)
 
         # TTS Controls
         tts_group = QVBoxLayout()
@@ -239,48 +204,46 @@ class DeepSeekApp(QMainWindow):
         top_layout.addLayout(stt_group)
         self.layout.addWidget(top_controls)
 
-        # Chat Display
-        self.output_display = QTextEdit()
-        self.output_display.setReadOnly(True)
-        self.layout.addWidget(self.output_display)
-
         # Speaking Status
         self.speaking_indicator = QLabel("")
         self.speaking_indicator.setStyleSheet("color: gray;")
         self.layout.addWidget(self.speaking_indicator)
 
-        # Input Section
-        input_frame = QFrame()
-        input_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
-        input_layout = QHBoxLayout(input_frame)
+    def create_new_tab(self):
+        """Create a new chat tab"""
+        model_name = self.model_config.list_available_models()[0]  # Default to first model
+        tab = self.tab_manager.create_model_tab(model_name)
+        return tab
 
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Type your message here...")
-        self.input_field.returnPressed.connect(self.handle_query)
-        input_layout.addWidget(self.input_field)
+    def save_current_session(self):
+        """Save the current chat session"""
+        current_tab = self.tab_manager.get_current_tab()
+        if current_tab:
+            model_name = self.tab_manager.tabText(self.tab_manager.currentIndex())
+            chat_text = current_tab.output_display.toPlainText()
+            
+            # Save to file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"chat_{model_name}_{timestamp}.txt"
+            
+            try:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(chat_text)
+                logger.info(f"Saved chat session to {filename}")
+            except Exception as e:
+                logger.error(f"Error saving chat session: {e}")
 
-        button_layout = QHBoxLayout()
-        self.submit_button = QPushButton("Send")
-        self.submit_button.clicked.connect(self.handle_query)
-        self.clear_button = QPushButton("Clear")
-        self.clear_button.clicked.connect(self.output_display.clear)
+    def clear_current_chat(self):
+        """Clear the current chat tab"""
+        current_tab = self.tab_manager.get_current_tab()
+        if current_tab:
+            current_tab.output_display.clear()
+            logger.info("Cleared current chat")
 
-        button_layout.addWidget(self.submit_button)
-        button_layout.addWidget(self.clear_button)
-        input_layout.addLayout(button_layout)
-
-        self.layout.addWidget(input_frame)
-
-        self.current_worker = None
-
-        # Welcome message
-        self.output_display.append(
-            "Welcome to AI Chat App! Select a model and start chatting."
-        )
-        self.output_display.append(
-            "TIP: Enable TTS to hear responses, or use the microphone for voice input."
-        )
-        self.output_display.append("-" * 50)
+    def show_shortcuts_dialog(self):
+        """Show the keyboard shortcuts configuration dialog"""
+        self.shortcut_manager.show_dialog()
+        logger.debug("Opened shortcuts dialog")
 
     def toggle_theme(self):
         """Toggle between light and dark themes"""
@@ -290,25 +253,28 @@ class DeepSeekApp(QMainWindow):
 
     def show_model_settings(self):
         """Show model settings dialog"""
-        # TODO: Implement model settings dialog
-        model = self.model_dropdown.currentText()
-        info = self.model_config.get_model_info(model)
-        if info:
-            self.output_display.append("\nModel Information:")
-            self.output_display.append(f"Name: {info['name']}")
-            self.output_display.append(f"Description: {info['description']}")
-            self.output_display.append(f"Context Length: {info['context_length']}")
-            self.output_display.append("Parameters:")
-            for k, v in info["parameters"].items():
-                self.output_display.append(f"  {k}: {v}")
-            self.output_display.append("-" * 50)
+        current_tab = self.tab_manager.get_current_tab()
+        if current_tab:
+            model_name = self.tab_manager.tabText(self.tab_manager.currentIndex())
+            info = self.model_config.get_model_info(model_name)
+            if info:
+                current_tab.output_display.append("\nModel Information:")
+                current_tab.output_display.append(f"Name: {info['name']}")
+                current_tab.output_display.append(f"Description: {info['description']}")
+                current_tab.output_display.append(f"Context Length: {info['context_length']}")
+                current_tab.output_display.append("Parameters:")
+                for k, v in info["parameters"].items():
+                    current_tab.output_display.append(f"  {k}: {v}")
+                current_tab.output_display.append("-" * 50)
 
     def toggle_tts(self, state):
         """Toggle TTS functionality"""
         self.tts_enabled = bool(state)
         self.stop_button.setEnabled(self.tts_enabled)
         status = "enabled" if self.tts_enabled else "disabled"
-        self.output_display.append(f"Text-to-Speech {status}")
+        current_tab = self.tab_manager.get_current_tab()
+        if current_tab:
+            current_tab.output_display.append(f"Text-to-Speech {status}")
 
     def stop_speaking(self):
         """Stop current TTS output"""
@@ -316,50 +282,12 @@ class DeepSeekApp(QMainWindow):
         self.speaking_indicator.setText("")
         self.stop_button.setEnabled(False)
 
-    def handle_query(self):
-        """Handle the submission of a query"""
-        query = self.input_field.text().strip()
-        if not query:
-            return
-
-        # Clear input field
-        self.input_field.clear()
-
-        # Display query
-        self.output_display.append(f"\nYou: {query}")
-
-        # Get selected model
-        model_name = self.model_dropdown.currentText()
-
-        # Start worker thread
-        self.current_worker = Worker(query, model_name, self.model_config)
-        self.current_worker.result_ready.connect(self.handle_response)
-        self.current_worker.start()
-
-    def handle_response(self, response: str):
-        """Handle the AI response"""
-        self.output_display.append(f"\nAI: {response}")
-
-        # Handle TTS if enabled
-        if hasattr(self, "tts_enabled") and self.tts_enabled:
-            if not self.speech_handler.is_speaking:
-                self.speaking_indicator.setText("🔊 AI is speaking...")
-                self.stop_button.setEnabled(True)
-
-                def tts_callback(error=None):
-                    self.speaking_indicator.setText("")
-                    self.stop_button.setEnabled(False)
-                    if error:
-                        self.output_display.append(f"TTS Error: {error}")
-
-                self.speech_handler.text_to_speech(
-                    response, self.tts_dropdown.currentText(), callback=tts_callback
-                )
-            else:
-                self.speech_handler.speech_queue.append(response)
-
     def start_listening(self):
         """Start STT recording"""
+        current_tab = self.tab_manager.get_current_tab()
+        if not current_tab:
+            return
+
         self.stt_button.setEnabled(False)
         self.stt_status.setText("Listening...")
 
@@ -367,10 +295,10 @@ class DeepSeekApp(QMainWindow):
             if status:
                 self.stt_status.setText(status)
             if text:
-                self.input_field.setText(text)
+                current_tab.input_field.setText(text)
                 self.stt_status.setText("Ready")
             if error:
-                self.output_display.append(f"STT Error: {error}")
+                current_tab.output_display.append(f"STT Error: {error}")
                 self.stt_status.setText("Ready")
             self.stt_button.setEnabled(True)
 
@@ -388,12 +316,17 @@ class DeepSeekApp(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.tab_manager.save_all_sessions()
 
-        if self.current_worker and self.current_worker.isRunning():
-            self.current_worker.quit()
-            self.current_worker.wait()
-        self.stop_speaking()  # Stop any ongoing TTS
-        event.accept()
+        # Stop any ongoing TTS
+        self.stop_speaking()
         
+        # Close all tabs and cleanup workers
+        for i in range(self.tab_manager.count()):
+            tab = self.tab_manager.widget(i)
+            if hasattr(tab, 'current_worker') and tab.current_worker and tab.current_worker.isRunning():
+                tab.current_worker.quit()
+                tab.current_worker.wait()
+        
+        event.accept()
         logger.info("Application closing")
 
 

@@ -2,223 +2,162 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QTextEdit,
     QPushButton,
     QLineEdit,
-    QHBoxLayout,
-    QMessageBox,
+    QFrame,
 )
-from PyQt6.QtCore import (
-    pyqtSignal,
-    Qt,
-    QThread,
-)
-from .chat_history import ChatHistory
-import logging
-import subprocess
-import re
-from typing import Optional
-
-logger = logging.getLogger("ui.tabs")
-
-
-class Worker(QThread):
-    """Worker thread for running AI models"""
-
-    result_ready = pyqtSignal(str)
-
-    def __init__(self, query: str, model_name: str):
-        super().__init__()
-        self.query = query
-        self.model_name = model_name
-
-    def run(self):
-        """Run the AI model query"""
-        try:
-            # Check if ollama is available
-            try:
-                subprocess.run(["ollama", "list"], capture_output=True, text=True)
-            except FileNotFoundError:
-                self.result_ready.emit("Error: Ollama is not installed or not in PATH")
-                return
-
-            # Run the query
-            result = subprocess.run(
-                ["ollama", "run", self.model_name],
-                input=self.query,
-                text=True,
-                capture_output=True,
-                encoding="utf-8",
-            )
-
-            if result.returncode != 0:
-                self.result_ready.emit(f"Error: {result.stderr}")
-                return
-
-            response = result.stdout.strip()
-            if not response:
-                self.result_ready.emit("Error: No response from the model")
-                return
-
-            self.result_ready.emit(response)
-
-        except Exception as e:
-            self.result_ready.emit(f"Error: {str(e)}")
-
-
-class ChatTab(QWidget):
-    """Individual chat tab widget"""
-
-    message_sent = pyqtSignal(str, str)  # (message, model_name)
-
-    def __init__(self, model_name: str, parent=None):
-        super().__init__(parent)
-        self.model_name = model_name
-        self.chat_history = ChatHistory()
-        self.current_worker = None
-        self.setup_ui()
-        logger.debug(f"Created new chat tab with model: {model_name}")
-
-    def setup_ui(self):
-        """Setup the chat tab UI"""
-        layout = QVBoxLayout(self)
-
-        # Chat display
-        self.output_display = QTextEdit()
-        self.output_display.setReadOnly(True)
-        layout.addWidget(self.output_display)
-
-        # Input area
-        input_layout = QHBoxLayout()
-
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Type your message...")
-        self.input_field.returnPressed.connect(self.send_message)
-
-        self.send_button = QPushButton("Send")
-        self.send_button.clicked.connect(self.send_message)
-
-        self.clear_button = QPushButton("Clear")
-        self.clear_button.clicked.connect(self.clear_chat)
-
-        input_layout.addWidget(self.input_field)
-        input_layout.addWidget(self.send_button)
-        input_layout.addWidget(self.clear_button)
-
-        layout.addLayout(input_layout)
-
-    def send_message(self):
-        """Handle sending a message"""
-        message = self.input_field.text().strip()
-        if not message:
-            return
-
-        # Display user message
-        self.output_display.append(f"You: {message}")
-        self.chat_history.add_message("user", message)
-        self.input_field.clear()
-
-        # Start AI response worker
-        self.current_worker = Worker(message, self.model_name)
-        self.current_worker.result_ready.connect(self.handle_response)
-        self.current_worker.start()
-
-        logger.debug(f"Sent message to model {self.model_name}")
-
-    def handle_response(self, response: str):
-        """Handle AI response"""
-        if response.startswith("Error:"):
-            self.output_display.append(f"System: {response}")
-            logger.error(f"AI response error: {response}")
-            return
-
-        # Clean response
-        response = re.sub(r"<.*?>", "", response).strip()
-
-        # Display response
-        self.output_display.append(f"AI: {response}")
-        self.chat_history.add_message("assistant", response)
-
-        logger.debug("Received and displayed AI response")
-
-    def clear_chat(self):
-        """Clear the chat display"""
-        reply = QMessageBox.question(
-            self,
-            "Clear Chat",
-            "Are you sure you want to clear the chat? This cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            self.output_display.clear()
-            logger.info("Chat cleared")
-
-    def save_session(self):
-        """Save the current chat session"""
-        self.chat_history.save_session()
-        logger.info("Chat session saved")
+from datetime import datetime
+from .model_config import ModelConfig
 
 
 class TabManager(QTabWidget):
-    """Manager for chat tabs"""
-
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.parent = parent
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.close_tab)
+        self.model_config = ModelConfig()
+        self.initialize_model_tabs()
 
-        # Add "+" button for new tabs
-        self.addTab(QWidget(), "+")
-        self.tabBarClicked.connect(self.handle_tab_click)
+    def initialize_model_tabs(self):
+        """Create initial tabs for each installed model"""
+        available_models = self.model_config.list_available_models()
+        for model in available_models:
+            self.create_model_tab(model)
 
-        logger.info("Tab manager initialized")
+    def create_model_tab(self, model_name):
+        """Create a new tab for a specific model"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
 
-    def create_new_tab(self, model_name: str):
-        """Create a new chat tab"""
-        tab = ChatTab(model_name)
-        index = self.count() - 1  # Insert before the "+" tab
-        self.insertTab(index, tab, f"Chat {index + 1}")
-        self.setCurrentIndex(index)
-        logger.debug(f"Created new tab with model: {model_name}")
+        # Chat display
+        output_display = QTextEdit()
+        output_display.setReadOnly(True)
+        layout.addWidget(output_display)
+
+        # Input section
+        input_frame = QFrame()
+        input_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        input_layout = QHBoxLayout(input_frame)
+
+        input_field = QLineEdit()
+        input_field.setPlaceholderText(f"Type your message for {model_name} here...")
+        input_layout.addWidget(input_field)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        submit_button = QPushButton("Send")
+        clear_button = QPushButton("Clear")
+        
+        button_layout.addWidget(submit_button)
+        button_layout.addWidget(clear_button)
+        input_layout.addLayout(button_layout)
+        
+        layout.addWidget(input_frame)
+
+        # Store references to widgets
+        tab.output_display = output_display
+        tab.input_field = input_field
+        tab.submit_button = submit_button
+        tab.clear_button = clear_button
+
+        # Connect signals
+        submit_button.clicked.connect(lambda: self.handle_query(tab))
+        clear_button.clicked.connect(output_display.clear)
+        input_field.returnPressed.connect(lambda: self.handle_query(tab))
+
+        # Add welcome message
+        output_display.append(f"Welcome to {model_name} chat!")
+        output_display.append("Type your message and press Enter or click Send.")
+        output_display.append("-" * 50)
+
+        # Add tab
+        self.addTab(tab, model_name)
         return tab
 
-    def close_tab(self, index: int):
-        """Close a tab"""
-        if self.count() > 2:  # Don't close if it's the last chat tab
-            tab = self.widget(index)
-            if isinstance(tab, ChatTab):
-                reply = QMessageBox.question(
-                    self,
-                    "Save Session",
-                    "Would you like to save this chat session?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+    def handle_query(self, tab):
+        """Handle query from the current tab"""
+        query = tab.input_field.text().strip()
+        if not query:
+            return
+
+        # Clear input field
+        tab.input_field.clear()
+
+        # Display query
+        tab.output_display.append(f"\nYou: {query}")
+
+        # Get model name from tab text
+        model_name = self.tabText(self.indexOf(tab))
+
+        # Start worker thread
+        from main import Worker  # Import here to avoid circular import
+        worker = Worker(query, model_name, self.model_config)
+        worker.result_ready.connect(lambda response: self.handle_response(tab, response))
+        worker.start()
+
+        # Store worker reference to prevent garbage collection
+        tab.current_worker = worker
+
+    def handle_response(self, tab, response: str):
+        """Handle AI response in the current tab"""
+        tab.output_display.append(f"\nAI: {response}")
+
+        # Handle TTS if enabled
+        if hasattr(self.parent, "tts_enabled") and self.parent.tts_enabled:
+            if not self.parent.speech_handler.is_speaking:
+                self.parent.speaking_indicator.setText("🔊 AI is speaking...")
+                self.parent.stop_button.setEnabled(True)
+
+                def tts_callback(error=None):
+                    self.parent.speaking_indicator.setText("")
+                    self.parent.stop_button.setEnabled(False)
+                    if error:
+                        tab.output_display.append(f"TTS Error: {error}")
+
+                self.parent.speech_handler.text_to_speech(
+                    response, 
+                    self.parent.tts_dropdown.currentText(), 
+                    callback=tts_callback
                 )
+            else:
+                self.parent.speech_handler.speech_queue.append(response)
 
-                if reply == QMessageBox.StandardButton.Yes:
-                    tab.save_session()
+    def close_tab(self, index):
+        """Close the specified tab"""
+        tab = self.widget(index)
+        
+        # Stop any running worker
+        if hasattr(tab, 'current_worker') and tab.current_worker:
+            tab.current_worker.quit()
+            tab.current_worker.wait()
+        
+        self.removeTab(index)
 
-            self.removeTab(index)
-            logger.debug(f"Closed tab at index: {index}")
+        # Don't allow closing the last tab
+        if self.count() == 0:
+            model_name = self.model_config.list_available_models()[0]
+            self.create_model_tab(model_name)
 
-    def handle_tab_click(self, index: int):
-        """Handle tab clicks"""
-        if index == self.count() - 1:
-            # Clicked on "+" tab, create new tab
-            self.create_new_tab("deepseek-coder")  # Default model
-            logger.debug("Created new tab via '+' button")
+    def get_current_tab(self):
+        """Get the currently active tab"""
+        return self.currentWidget()
 
     def save_all_sessions(self):
-        """Save all active chat sessions"""
-        for i in range(self.count() - 1):  # Exclude the "+" tab
+        """Save chat history from all tabs"""
+        for i in range(self.count()):
             tab = self.widget(i)
-            if isinstance(tab, ChatTab):
-                tab.save_session()
-        logger.info("Saved all chat sessions")
-
-    def get_current_tab(self) -> Optional[ChatTab]:
-        """Get the currently active chat tab"""
-        current_widget = self.currentWidget()
-        if isinstance(current_widget, ChatTab):
-            return current_widget
-        return None
+            model_name = self.tabText(i)
+            chat_text = tab.output_display.toPlainText()
+            
+            # Save to file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"chat_{model_name}_{timestamp}.txt"
+            
+            try:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(chat_text)
+            except Exception as e:
+                print(f"Error saving chat session: {e}")
