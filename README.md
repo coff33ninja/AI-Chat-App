@@ -227,3 +227,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with PyQt6
 - Uses Ollama for AI integration
 - Inspired by modern chat applications
+
+## Reporting Bugs
+
+If you encounter any bugs or issues while using the AI Chat App, please follow these steps to report them:
+
+1. **Check Existing Issues**: Before creating a new issue, please check the [Issues](https://github.com/coff33ninja/AI-Chat-App/issues) section of the repository to see if your issue has already been reported.
+
+2. **Collect Logs**: To help us diagnose the problem, please collect the relevant logs. The application includes a comprehensive logging system that records various events and errors. You can find the logs in the `logs` directory of the project.
+
+3. **Create a New Issue**: If your issue is not listed, please create a new issue in the [Issues](https://github.com/coff33ninja/AI-Chat-App/issues) section. Provide the following information:
+   - A clear and descriptive title for the issue.
+   - A detailed description of the problem, including steps to reproduce it.
+   - Any relevant logs or error messages you collected.
+   - Your operating system and version.
+   - Any other information that may help us understand the issue.
+
+Thank you for your help in improving the AI Chat App!
