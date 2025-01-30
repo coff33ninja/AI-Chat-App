@@ -30,13 +30,26 @@ if (-not (Test-Command git)) {
 }
 
 # Check and install Ollama if not present
-if (-not (Test-Command ollama)) {
+if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
     Write-Host "Installing Ollama..." -ForegroundColor Yellow
     $ollamaInstaller = "$env:TEMP\ollama-installer.exe"
-    Invoke-WebRequest -Uri "https://ollama.ai/download/windows" -OutFile $ollamaInstaller
+
+    # Download the installer
+    Invoke-WebRequest -Uri "https://ollama.ai/download/OllamaSetup.exe" -OutFile $ollamaInstaller
+
+    # Install silently
     Start-Process -FilePath $ollamaInstaller -ArgumentList "/S" -Wait
-    Remove-Item $ollamaInstaller
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+    # Remove installer after installation
+    Remove-Item $ollamaInstaller -Force
+
+    # Refresh environment variables
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+    Write-Host "Ollama installation complete. Restart your terminal or run 'refreshenv' (if using Chocolatey)." -ForegroundColor Green
+} else {
+    Write-Host "Ollama is already installed." -ForegroundColor Cyan
 }
 
 # Clone repository
