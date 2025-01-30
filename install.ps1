@@ -63,7 +63,7 @@ function Install-Package {
 }
 
 # Install Python and FFmpeg with fallback
-Install-Package -WingetId "Python.Python.3.10" -ChocoId "python310" -Name "Python"
+Install-Package -WingetId "Python.Python.3.11" -ChocoId "python311" -Name "Python"
 Install-Package -WingetId "Gyan.FFmpeg" -ChocoId "ffmpeg" -Name "FFmpeg"
 
 # Refresh environment variables
@@ -132,7 +132,7 @@ if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
 # Launch post-install script in a new window
 Write-Host "Launching environment setup in a new window..." -ForegroundColor Yellow
 
-Create desktop shortcut
+# Create desktop shortcut
 Write-Host "Creating desktop shortcut..." -ForegroundColor Green
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\AI-Chat-App.lnk")
