@@ -243,16 +243,22 @@ class DeepSeekApp(QMainWindow):
             model_name = self.tab_manager.tabText(self.tab_manager.currentIndex())
             chat_text = current_tab.output_display.toPlainText()
             
-            # Save to file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"chat_{model_name}_{timestamp}.txt"
-            
             try:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.write(chat_text)
-                logger.info(f"Saved chat session to {filename}")
+                # Save to chat history
+                session_name = f"{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                messages = []
+                for line in chat_text.split('\n'):
+                    if line.startswith("User: "):
+                        messages.append({"role": "user", "content": line[6:]})
+                    elif line.startswith("Assistant: "):
+                        messages.append({"role": "assistant", "content": line[11:]})
+                
+                self.chat_history.current_session = messages
+                if self.chat_history.save_session(session_name):
+                    logger.info(f"Saved chat session to chat history: {session_name}")
             except Exception as e:
                 logger.error(f"Error saving chat session: {e}")
+
 
     def clear_current_chat(self):
         """Clear the current chat tab"""

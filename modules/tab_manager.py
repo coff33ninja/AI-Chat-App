@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 from datetime import datetime
 import logging
 from .model_config import ModelConfig
+from .chat_history import ChatHistory
 
 
 class TabManager(QTabWidget):
@@ -23,6 +24,7 @@ class TabManager(QTabWidget):
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.close_tab)
         self.model_config = ModelConfig()
+        self.chat_history = ChatHistory()
         self.initialize_model_tabs()
 
     def initialize_model_tabs(self):
@@ -100,7 +102,7 @@ class TabManager(QTabWidget):
         self.logger.info(f"Processing query for model {model_name}: {query[:50]}...")
 
         # Display query
-        tab.output_display.append(f"\nYou: {query}")
+        tab.output_display.append(f"\nUser: {query}")
 
         # Start worker thread
         from main import Worker  # Import here to avoid circular import
@@ -117,7 +119,7 @@ class TabManager(QTabWidget):
         model_name = self.tabText(self.indexOf(tab))
         self.logger.info(f"Received response from model {model_name}: {response[:50]}...")
         
-        tab.output_display.append(f"\nAI: {response}")
+        tab.output_display.append(f"\nAssistant: {response}")
 
         # Handle TTS if enabled
         if hasattr(self.parent, "tts_enabled") and self.parent.tts_enabled:
@@ -178,13 +180,18 @@ class TabManager(QTabWidget):
             model_name = self.tabText(i)
             chat_text = tab.output_display.toPlainText()
             
-            # Save to file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"chat_{model_name}_{timestamp}.txt"
-            
             try:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.write(chat_text)
-                self.logger.info(f"Saved chat session for model {model_name} to {filename}")
+                # Save to chat history
+                session_name = f"{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                messages = []
+                for line in chat_text.split('\n'):
+                    if line.startswith("User: "):
+                        messages.append({"role": "user", "content": line[6:]})
+                    elif line.startswith("Assistant: "):
+                        messages.append({"role": "assistant", "content": line[11:]})
+                
+                self.chat_history.current_session = messages
+                if self.chat_history.save_session(session_name):
+                    self.logger.info(f"Saved chat session to chat history: {session_name}")
             except Exception as e:
                 self.logger.error(f"Error saving chat session for model {model_name}: {str(e)}")
