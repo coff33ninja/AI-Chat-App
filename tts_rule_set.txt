@@ -1,0 +1,21 @@
+TTS Rule Set for DeepSeekApp
+1. TTS Activation
+TTS will only activate when explicitly enabled by the user via a toggle, command, or setting.
+TTS will read only the AI’s responses, not the user’s input.
+A manual stop option should be available to halt speech output at any time.
+2. AI Speech Monitoring
+A clear visual indicator (such as a UI animation or status message) will display when the AI is speaking.
+Optional auditory cues (e.g., a short chime before or after TTS) can be enabled for additional feedback.
+3. Input Handling & Interruptions
+Pressing Enter sends the user's query.
+Pressing Shift + Enter creates a new line within the input field.
+If the user submits a new query while TTS is speaking, the AI should either:
+Automatically stop speaking and process the new query.
+Queue the new response and allow the user to control when it starts.
+4. Conversational Flow & Responsiveness
+TTS will always wait for the AI's full response before reading it aloud.
+If STT (Speech-to-Text) is enabled in the future, seamless transitions between spoken input and output should be prioritized.
+If a response is long, the AI should naturally pause between sentences to mimic human conversation.
+5. Refinement & Future Expansion
+The rule set will be revised as user feedback is gathered.
+Additional features, such as voice tone adjustments or more natural speech synthesis, may be considered to enhance human-like interaction.

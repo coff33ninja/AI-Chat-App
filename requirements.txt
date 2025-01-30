@@ -1,0 +1,6 @@
+PyQt6>=6.0.0
+pyttsx3>=2.90
+openai-whisper>=20231117
+sounddevice>=0.4.6
+numpy>=1.24.0
+TTS>=0.22.0  # Optional: Coqui TTS for better speech synthesis
