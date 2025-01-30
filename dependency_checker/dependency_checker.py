@@ -107,10 +107,10 @@ def check_all_dependencies(module_name: str = None, verbose: bool = True) -> boo
         for package, description in deps.get('packages', {}).items():
             if check_module(package):
                 if verbose:
-                    print(f"✅ {description}: {package}")
+                    print(f"[OK] {description}: {package}")
             else:
                 if verbose:
-                    print(f"❌ {description}: {package}")
+                    print(f"[X] {description}: {package}")
                     print(f"   To install: pip install {package}")
                 all_ok = False
         
@@ -121,10 +121,10 @@ def check_all_dependencies(module_name: str = None, verbose: bool = True) -> boo
         for command, description in commands.items():
             if check_command(command):
                 if verbose:
-                    print(f"✅ {description}: {command}")
+                    print(f"[OK] {description}: {command}")
             else:
                 if verbose:
-                    print(f"❌ {description}: {command}")
+                    print(f"[X] {description}: {command}")
                     if command == 'ffplay':
                         print("   Download FFmpeg from: https://ffmpeg.org/download.html")
                         print("   Make sure to add it to your system PATH")
@@ -132,9 +132,9 @@ def check_all_dependencies(module_name: str = None, verbose: bool = True) -> boo
     
     if verbose:
         if all_ok:
-            print("\n✅ All dependencies are satisfied!")
+            print("\n[OK] All dependencies are satisfied!")
         else:
-            print("\n❌ Some dependencies are missing. Please install them and try again.")
+            print("\n[X] Some dependencies are missing. Please install them and try again.")
     
     return all_ok
 
@@ -180,7 +180,7 @@ def automated_scan():
         if install_choice == 'y':
             install_missing_packages(missing)
     else:
-        print("✅ All dependencies are satisfied!")
+        print("[OK] All dependencies are satisfied!")
 
 if __name__ == "__main__":
     automated_scan()
