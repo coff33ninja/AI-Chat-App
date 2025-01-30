@@ -1,0 +1,43 @@
+{
+    "speech_module": {
+        "packages": {
+            "TTS": "Text-to-Speech (Coqui TTS)",
+            "pyttsx3": "Text-to-Speech (System)",
+            "whisper": "Speech-to-Text (OpenAI Whisper)",
+            "sounddevice": "Audio recording",
+            "numpy": "Numerical computations",
+            "PyQt6": "GUI framework"
+        },
+        "commands": {
+            "ffplay": "FFmpeg audio playback"
+        }
+    },
+    "chat_history": {
+        "packages": {
+            "json": "JSON handling",
+            "datetime": "Date and time handling"
+        }
+    },
+    "model_config": {
+        "packages": {
+            "json": "JSON handling",
+            "typing": "Type hints"
+        }
+    },
+    "shortcut_manager": {
+        "packages": {
+            "PyQt6": "GUI framework"
+        }
+    },
+    "tab_manager": {
+        "packages": {
+            "PyQt6": "GUI framework"
+        }
+    },
+    "theme_manager": {
+        "packages": {
+            "PyQt6": "GUI framework",
+            "json": "JSON handling"
+        }
+    }
+}

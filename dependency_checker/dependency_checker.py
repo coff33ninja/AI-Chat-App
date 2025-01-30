@@ -11,49 +11,12 @@ import os
 from pathlib import Path
 
 # Define module dependencies
-MODULE_DEPENDENCIES = {
-    'speech_module': {
-        'packages': {
-            'TTS': 'Text-to-Speech (Coqui TTS)',
-            'pyttsx3': 'Text-to-Speech (System)',
-            'whisper': 'Speech-to-Text (OpenAI Whisper)',
-            'sounddevice': 'Audio recording',
-            'numpy': 'Numerical computations',
-            'PyQt6': 'GUI framework'
-        },
-        'commands': {
-            'ffplay': 'FFmpeg audio playback'
-        }
-    },
-    'chat_history': {
-        'packages': {
-            'json': 'JSON handling',
-            'datetime': 'Date and time handling'
-        }
-    },
-    'model_config': {
-        'packages': {
-            'json': 'JSON handling',
-            'typing': 'Type hints'
-        }
-    },
-    'shortcut_manager': {
-        'packages': {
-            'PyQt6': 'GUI framework'
-        }
-    },
-    'tab_manager': {
-        'packages': {
-            'PyQt6': 'GUI framework'
-        }
-    },
-    'theme_manager': {
-        'packages': {
-            'PyQt6': 'GUI framework',
-            'json': 'JSON handling'
-        }
-    }
-}
+def load_module_dependencies() -> Dict:
+    """Load module dependencies from a JSON file."""
+    with open('dependency_checker/module_dependencies.json', 'r') as f:
+        return json.load(f)
+
+MODULE_DEPENDENCIES = load_module_dependencies()
 
 def check_module(module_name: str) -> bool:
     """Check if a Python module is installed"""
@@ -93,6 +56,18 @@ def get_missing_dependencies(module_name: str = None) -> Dict[str, List[str]]:
                 missing['commands'].append(command)
     
     return missing
+
+def check_venv_exists() -> bool:
+    """Check if a virtual environment exists in the root directory."""
+    return os.path.exists('venv') or os.path.exists('env')
+
+def install_missing_packages(missing: Dict[str, List[str]]):
+    """Install missing packages in the virtual environment if it exists."""
+    if check_venv_exists():
+        for package in missing['packages']:
+            subprocess.run([sys.executable, '-m', 'pip', 'install', package])
+    else:
+        print("No virtual environment found. Please create one and install the packages manually.")
 
 def check_all_dependencies(module_name: str = None, verbose: bool = True) -> bool:
     """
@@ -163,6 +138,51 @@ def check_all_dependencies(module_name: str = None, verbose: bool = True) -> boo
     
     return all_ok
 
+def check_pip_installed() -> bool:
+    """Check if pip is installed."""
+    return subprocess.call([sys.executable, '-m', 'pip', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0
+
+def install_pip():
+    """Install pip using get-pip.py."""
+    print("pip is not installed. Installing pip...")
+    subprocess.run([sys.executable, 'dependency_checker/get-pip.py'])
+
+def automated_scan():
+    # Check if pip is installed
+    if not check_pip_installed():
+        install_pip()
+    """Automate the dependency scanning process."""
+    missing = get_missing_dependencies()
+    
+    if missing['packages'] or missing['commands']:
+        print("\nMissing dependencies found:")
+        if missing['packages']:
+            print("Packages:")
+            for package in missing['packages']:
+                print(f" - {package}")
+        if missing['commands']:
+            print("Commands:")
+            for command in missing['commands']:
+                print(f" - {command}")
+        
+        use_venv = check_venv_exists()
+        if use_venv:
+            print("\nYou are currently using a virtual environment.")
+            print("It is recommended to install packages in the virtual environment to avoid conflicts.")
+        else:
+            print("\nYou are not using a virtual environment.")
+            print("Using a virtual environment is recommended to manage dependencies separately.")
+        
+        if use_venv:
+            install_choice = input("A virtual environment is available. Do you want to install the missing packages in it? (y/n): ").strip().lower()
+        else:
+            install_choice = input("Do you want to install the missing packages? (y/n): ").strip().lower()
+        if install_choice == 'y':
+            install_missing_packages(missing)
+    else:
+        print("✅ All dependencies are satisfied!")
+
 if __name__ == "__main__":
+    automated_scan()
     # If run directly, check all dependencies
     sys.exit(0 if check_all_dependencies() else 1)
