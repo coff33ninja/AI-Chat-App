@@ -22,19 +22,28 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
+env/
+.env
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+.project
+.pydevproject
+.settings/
 
 # Project specific
-stt_record.wav
+*.wav
 output.wav
+stt_record.wav
+
+# Logs and databases
 *.log
+*.sqlite
+*.db
 
 # OS specific
 .DS_Store

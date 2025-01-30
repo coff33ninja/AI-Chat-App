@@ -1,44 +1,39 @@
 # DeepSeek AI Assistant
 
-A desktop application that combines AI chat capabilities with speech features, built with PyQt6.
+A desktop application that provides an interface to interact with DeepSeek AI models, featuring text-to-speech and speech-to-text capabilities.
 
 ## Features
 
-- AI Chat Interface using Ollama models
-- Text-to-Speech (TTS) for AI responses
-- Speech-to-Text (STT) for voice input
-- Multiple TTS engine support
+- Interactive chat interface with DeepSeek AI models
+- Text-to-Speech (TTS) support with multiple engines:
   - System TTS (pyttsx3)
   - Coqui TTS (optional)
-- Intuitive UI with keyboard shortcuts
+- Speech-to-Text (STT) using OpenAI's Whisper
+- Configurable model selection
+- Queue system for TTS responses
+- Visual feedback for AI speech status
 
 ## Requirements
 
-- Python 3.8+
-- Ollama installed and in PATH
-- Required Python packages (see requirements.txt)
+- Python 3.8 or higher
+- Ollama (for AI model interaction)
+- PyQt6 (for GUI)
+- Additional dependencies listed in requirements.txt
 
-## AI Setup
+## Installation
 
-1. Install Ollama:
-   - Visit [Ollama's official website](https://ollama.ai)
-   - Follow installation instructions for your operating system
-   - Make sure it's added to your system PATH
-
-2. Pull required models:
+1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/yourusername/deepseek-assistant.git
 cd deepseek-assistant
 ```
 
-2. Install required packages:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Install Ollama:
-   - Follow instructions at [Ollama's official website](https://ollama.ai)
-   - Make sure it's added to your system PATH
+3. Install Ollama following instructions at: https://ollama.ai/
 
 ## Usage
 
@@ -47,48 +42,36 @@ pip install -r requirements.txt
 python Deepseek-ai.py
 ```
 
-2. Select an AI model from the dropdown
-3. Type your query or use the voice input button
-4. Toggle TTS to have AI responses read aloud
+2. Select your preferred AI model from the dropdown
+3. Type your query and press Enter or click Send
+4. Toggle TTS to enable voice responses
+5. Use the microphone button for voice input
 
-## Keyboard Shortcuts
-
-- `Enter`: Send message
-- `Shift + Enter`: New line in input field
-
-## TTS Rules
+## TTS Rules and Behavior
 
 1. TTS Activation
-   - Only activates when explicitly enabled via toggle
-   - Only reads AI responses
+   - TTS only activates when explicitly enabled via toggle
+   - Only AI responses are read aloud
    - Manual stop option available
 
 2. AI Speech Monitoring
    - Visual indicator shows when AI is speaking
-   - Optional auditory cues
+   - Optional auditory cues for feedback
 
 3. Input Handling & Interruptions
-   - Enter sends query
-   - Shift+Enter creates new line
+   - Enter sends the query
+   - Shift+Enter creates a new line
    - New queries during speech are queued
 
 4. Conversational Flow
-   - Waits for complete AI response
+   - Waits for complete AI response before speaking
    - Natural pauses between responses
-   - Queue system for multiple responses
+   - Seamless transitions between spoken input/output
 
-## Dependencies
+## Contributing
 
-Core dependencies:
-- PyQt6: UI framework
-- pyttsx3: System TTS
-- openai-whisper: Speech recognition
-- sounddevice: Audio recording
-- numpy: Numerical operations
-
-Optional:
-- Coqui TTS: Enhanced TTS capabilities
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-[MIT License](LICENSE)
+This project is licensed under the MIT License - see the LICENSE file for details.
