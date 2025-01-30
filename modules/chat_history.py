@@ -9,7 +9,7 @@ logger = logging.getLogger("main.history")
 
 
 class ChatHistory:
-    def __init__(self, storage_dir: str = "chat_history"):
+    def __init__(self, storage_dir: str = "chat_history/chat_history"):
         self.storage_dir = storage_dir
         self.current_session = []
         self.session_name = None
