@@ -34,8 +34,8 @@ class ChatHistory:
 
     def save_session(self, session_name: Optional[str] = None):
         """Save current session to file"""
-        if not self.current_session:
-            logger.debug("No messages to save")
+        if not self.current_session or (len(self.current_session) == 1 and self.current_session[0]['content'].startswith("Welcome to")):
+            logger.debug("No meaningful messages to save")
             return
 
         if session_name is None:
