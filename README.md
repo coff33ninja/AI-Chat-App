@@ -153,7 +153,7 @@ Both scripts feature:
 ## Dependencies
 
 ### Core Requirements
-- Python 3.10 or higher
+- Python 3.11 or higher
 - PyQt6
 - Ollama
 - FFmpeg
