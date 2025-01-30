@@ -48,3 +48,4 @@ stt_record.wav
 # OS specific
 .DS_Store
 Thumbs.db
+chat_history/
