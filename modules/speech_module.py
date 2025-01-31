@@ -10,6 +10,23 @@ import unicodedata
 # Get logger for speech module
 logger = logging.getLogger("main.speech")
 
+# Character replacement map for common problematic Unicode characters
+CHAR_REPLACEMENTS = {
+    '\u0254': 'o',  # Open O -> o
+    '\u028a': 'u',  # Upsilon -> u
+    '\u0259': 'e',  # Schwa -> e
+    '\u025b': 'e',  # Open E -> e
+    '\u0251': 'a',  # Script A -> a
+    '\u0252': 'a',  # Turned Alpha -> a
+    '\u026a': 'i',  # Small Capital I -> i
+    '\u0283': 'sh', # Esh -> sh
+    '\u027e': 'r',  # R with Fishhook -> r
+    '\u0292': 'zh', # Ezh -> zh
+    '\u03b8': 'th', # Theta -> th
+    '\u00f0': 'th', # Eth -> th
+    '\u014b': 'ng', # Eng -> ng
+}
+
 # Optional imports with fallbacks
 try:
     from TTS.api import TTS
@@ -84,19 +101,26 @@ class SpeechHandler:
         return "TTS is ready"
 
     def _sanitize_text(self, text):
-        """Sanitize text for TTS processing by handling problematic characters"""
+        """Enhanced text sanitization for TTS processing"""
         try:
-            # First attempt: Try to normalize the Unicode text
+            # First, replace known problematic characters
+            for char, replacement in CHAR_REPLACEMENTS.items():
+                if char in text:
+                    text = text.replace(char, replacement)
+                    logger.debug(f"Replaced character {char} with {replacement}")
+
+            # Then normalize remaining Unicode characters
             normalized = unicodedata.normalize('NFKD', text)
             
-            # Remove any remaining non-ASCII characters
-            sanitized = ''.join(c for c in normalized if ord(c) < 128)
+            # Convert to ASCII, ignoring non-ASCII characters
+            sanitized = normalized.encode('ascii', 'ignore').decode('ascii')
             
-            # Log if any characters were removed
+            # Log any remaining characters that were removed
             if sanitized != text:
-                removed_chars = set(c for c in text if c not in sanitized)
-                logger.debug(f"Removed unsupported characters: {removed_chars}")
-                
+                removed_chars = set(c for c in text if c not in sanitized and c not in CHAR_REPLACEMENTS)
+                if removed_chars:
+                    logger.debug(f"Removed unsupported characters: {removed_chars}")
+            
             return sanitized
             
         except Exception as e:
@@ -120,8 +144,10 @@ class SpeechHandler:
 
         # Clean and sanitize the text
         text = re.sub(r"<.*?>", "", text).strip()
+        original_text = text
         text = self._sanitize_text(text)
-        logger.debug(f"Cleaned and sanitized text for TTS: {text[:50]}...")
+        if text != original_text:
+            logger.debug(f"Text sanitized from: {original_text[:50]}... to: {text[:50]}...")
 
         try:
             if method == "pyttsx3 (System)" and PYTTSX3_AVAILABLE:
@@ -166,7 +192,8 @@ class SpeechHandler:
             
             # Enhanced error logging for character encoding issues
             if "charmap" in str(e):
-                logger.error(f"Character encoding error in TTS. Original text: {text}")
+                logger.error(f"Character encoding error in TTS. Original text: {original_text}")
+                logger.error(f"Sanitized text: {text}")
                 logger.error(f"Error details: {str(e)}")
             else:
                 logger.error(f"TTS error: {str(e)}")
