@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 import sys
+import os
 import subprocess
 import logging
 from datetime import datetime
@@ -119,6 +120,9 @@ class AIChatApp(QMainWindow):
 
         # Apply default theme
         self.theme_manager.apply_theme(QApplication.instance(), Theme.LIGHT)
+        
+        # Initialize TTS status
+        self.speaking_indicator.setText(self.speech_handler.is_tts_working())
         
         logger.info("Application initialized")
 
@@ -259,7 +263,6 @@ class AIChatApp(QMainWindow):
             except Exception as e:
                 logger.error(f"Error saving chat session: {e}")
 
-
     def clear_current_chat(self):
         """Clear the current chat tab"""
         current_tab = self.tab_manager.get_current_tab()
@@ -302,12 +305,13 @@ class AIChatApp(QMainWindow):
         current_tab = self.tab_manager.get_current_tab()
         if current_tab:
             current_tab.output_display.append(f"Text-to-Speech {status}")
+        # Update TTS status indicator
+        self.speaking_indicator.setText(self.speech_handler.is_tts_working())
 
     def stop_speaking(self):
         """Stop current TTS output"""
         self.speech_handler.stop_speaking()
-        self.speaking_indicator.setText("")
-        self.stop_button.setEnabled(False)
+        # Status will be updated by the speech handler
 
     def start_listening(self):
         """Start STT recording"""
@@ -332,7 +336,10 @@ class AIChatApp(QMainWindow):
         self.speech_handler.start_listening(callback=stt_callback)
 
     def closeEvent(self, event):
-        """Clean up before closing"""
+        """Enhanced cleanup before closing"""
+        logger.info("Starting application shutdown...")
+        
+        # Ask to save sessions
         reply = QMessageBox.question(
             self,
             "Save Sessions",
@@ -341,20 +348,40 @@ class AIChatApp(QMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
+            logger.info("Saving all chat sessions...")
             self.tab_manager.save_all_sessions()
 
         # Stop any ongoing TTS
+        logger.debug("Stopping TTS...")
         self.stop_speaking()
         
         # Close all tabs and cleanup workers
+        logger.debug("Cleaning up worker threads...")
         for i in range(self.tab_manager.count()):
             tab = self.tab_manager.widget(i)
-            if hasattr(tab, 'current_worker') and tab.current_worker and tab.current_worker.isRunning():
-                tab.current_worker.quit()
-                tab.current_worker.wait()
+            if hasattr(tab, 'current_worker') and tab.current_worker:
+                if tab.current_worker.isRunning():
+                    logger.debug(f"Stopping worker thread for tab {i}")
+                    tab.current_worker.quit()
+                    tab.current_worker.wait()
+                    logger.debug(f"Worker thread for tab {i} stopped")
         
+        # Clean up any temporary files
+        logger.debug("Cleaning up temporary files...")
+        if hasattr(self.speech_handler, 'output_dir') and os.path.exists(self.speech_handler.output_dir):
+            try:
+                for file in os.listdir(self.speech_handler.output_dir):
+                    file_path = os.path.join(self.speech_handler.output_dir, file)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        logger.debug(f"Removed temporary file: {file_path}")
+                os.rmdir(self.speech_handler.output_dir)
+                logger.debug("Removed temporary directory")
+            except Exception as e:
+                logger.warning(f"Error cleaning up temporary files: {e}")
+        
+        logger.info("Application shutdown complete")
         event.accept()
-        logger.info("Application closing")
 
 
 if __name__ == "__main__":

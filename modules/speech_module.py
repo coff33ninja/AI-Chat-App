@@ -5,6 +5,7 @@ import subprocess
 import wave
 import numpy as np
 import logging
+import unicodedata
 
 # Get logger for speech module
 logger = logging.getLogger("main.speech")
@@ -76,8 +77,35 @@ class SpeechHandler:
         logger.debug(f"Available TTS methods: {methods}")
         return methods
 
+    def is_tts_working(self):
+        """Check if TTS is currently working and return status"""
+        if self.is_speaking:
+            return "TTS is currently speaking"
+        return "TTS is ready"
+
+    def _sanitize_text(self, text):
+        """Sanitize text for TTS processing by handling problematic characters"""
+        try:
+            # First attempt: Try to normalize the Unicode text
+            normalized = unicodedata.normalize('NFKD', text)
+            
+            # Remove any remaining non-ASCII characters
+            sanitized = ''.join(c for c in normalized if ord(c) < 128)
+            
+            # Log if any characters were removed
+            if sanitized != text:
+                removed_chars = set(c for c in text if c not in sanitized)
+                logger.debug(f"Removed unsupported characters: {removed_chars}")
+                
+            return sanitized
+            
+        except Exception as e:
+            logger.error(f"Error during text sanitization: {str(e)}")
+            # Return original text if sanitization fails
+            return text
+
     def text_to_speech(self, text, method, callback=None):
-        """Enhanced TTS function with visual feedback"""
+        """Enhanced TTS function with visual feedback and character encoding handling"""
         if not text or len(text.strip()) < 5:
             logger.warning("Text too short or empty for TTS")
             return False
@@ -85,9 +113,15 @@ class SpeechHandler:
         self.is_speaking = True
         logger.info(f"Starting TTS using method: {method}")
 
-        # Clean the text
+        # Update UI indicator if parent exists
+        if self.parent and hasattr(self.parent, 'speaking_indicator'):
+            self.parent.speaking_indicator.setText("Speaking...")
+            self.parent.stop_button.setEnabled(True)
+
+        # Clean and sanitize the text
         text = re.sub(r"<.*?>", "", text).strip()
-        logger.debug(f"Cleaned text for TTS: {text[:50]}...")
+        text = self._sanitize_text(text)
+        logger.debug(f"Cleaned and sanitized text for TTS: {text[:50]}...")
 
         try:
             if method == "pyttsx3 (System)" and PYTTSX3_AVAILABLE:
@@ -113,6 +147,10 @@ class SpeechHandler:
                 )
             else:
                 self.is_speaking = False
+                # Update UI indicator
+                if self.parent and hasattr(self.parent, 'speaking_indicator'):
+                    self.parent.speaking_indicator.setText("TTS Ready")
+                    self.parent.stop_button.setEnabled(False)
                 if callback:
                     callback()
                 logger.info("TTS completed successfully")
@@ -121,7 +159,18 @@ class SpeechHandler:
 
         except Exception as e:
             self.is_speaking = False
-            logger.error(f"TTS error: {str(e)}")
+            # Update UI indicator on error
+            if self.parent and hasattr(self.parent, 'speaking_indicator'):
+                self.parent.speaking_indicator.setText("TTS Error")
+                self.parent.stop_button.setEnabled(False)
+            
+            # Enhanced error logging for character encoding issues
+            if "charmap" in str(e):
+                logger.error(f"Character encoding error in TTS. Original text: {text}")
+                logger.error(f"Error details: {str(e)}")
+            else:
+                logger.error(f"TTS error: {str(e)}")
+            
             if callback:
                 callback(error=str(e))
             return False
@@ -175,6 +224,10 @@ class SpeechHandler:
         logger.info("Stopping TTS output")
         self.is_speaking = False
         self.speech_queue.clear()
+        # Update UI indicator
+        if self.parent and hasattr(self.parent, 'speaking_indicator'):
+            self.parent.speaking_indicator.setText("TTS Stopped")
+            self.parent.stop_button.setEnabled(False)
         if hasattr(self, "engine") and self.engine:
             try:
                 self.engine.stop()
