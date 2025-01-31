@@ -1,6 +1,8 @@
 import sys
 import logging
-from PyQt6.QtWidgets import QApplication
+import traceback
+from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtCore import Qt
 from modules.main_window import MainWindow
 
 # Configure logging with a valid datetime format
@@ -12,10 +14,31 @@ logging.basicConfig(
 
 logger = logging.getLogger("run_app")
 
+def show_error_dialog(message, details=None):
+    """Show an error dialog to the user"""
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Icon.Critical)
+    msg.setText(message)
+    msg.setWindowTitle("Application Error")
+    if details:
+        msg.setDetailedText(details)
+    msg.exec()
+
+def exception_handler(exctype, value, tb):
+    """Global exception handler"""
+    error_msg = ''.join(traceback.format_exception(exctype, value, tb))
+    logger.error(f"Uncaught exception:\n{error_msg}")
+
+    # Show error dialog to user
+    show_error_dialog(
+        "An unexpected error occurred.",
+        f"Error Type: {exctype.__name__}\nError Message: {str(value)}\n\nTraceback:\n{error_msg}"
+    )
+
 def check_dependencies():
     """Check if all required dependencies are installed"""
     logger.info("Running dependency check...")
-    
+
     # List of dependencies to check
     dependencies = {
         "speech_module": {
@@ -62,11 +85,11 @@ def check_dependencies():
     }
 
     print("Checking dependencies...")
-    all_satisfied = True
+    missing_deps = []
 
     for module, categories in dependencies.items():
         print(f"\nChecking dependencies for {module}:")
-        
+
         for category, deps in categories.items():
             print(f"\n{category}:")
             for dep_name, dep_package in deps.items():
@@ -81,36 +104,59 @@ def check_dependencies():
                     print(f"[OK] {dep_name}: {dep_package}")
                 except ImportError:
                     print(f"[FAIL] {dep_name}: {dep_package}")
-                    all_satisfied = False
+                    missing_deps.append(f"{dep_name} ({dep_package})")
                 except FileNotFoundError:
                     print(f"[FAIL] {dep_name}: {dep_package}")
-                    all_satisfied = False
+                    missing_deps.append(f"{dep_name} ({dep_package})")
 
-    if all_satisfied:
+    if not missing_deps:
         print("\n[OK] All dependencies are satisfied!")
         logger.info("All dependencies are satisfied")
+        return True
     else:
-        print("\n[FAIL] Some dependencies are missing!")
-        logger.error("Some dependencies are missing")
-        
-    return all_satisfied
+        error_msg = "The following dependencies are missing:\n- " + "\n- ".join(missing_deps)
+        print(f"\n[FAIL] {error_msg}")
+        logger.error(error_msg)
+        show_error_dialog("Missing Dependencies", error_msg)
+        return False
 
 def main():
     """Main application entry point"""
-    logger.info("Starting the application setup process...")
-    
-    # Check dependencies
-    logger.info("Running dependency check...")
-    if not check_dependencies():
-        logger.error("Dependency check failed. Please install missing dependencies.")
+    try:
+        logger.info("Starting the application setup process...")
+
+        # Set up global exception handler
+        sys.excepthook = exception_handler
+
+        # Create QApplication instance
+        app = QApplication(sys.argv)
+
+        # Enable High DPI scaling
+        # app.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+        # app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+
+        # Check dependencies
+        logger.info("Running dependency check...")
+        if not check_dependencies():
+            logger.error("Dependency check failed. Please install missing dependencies.")
+            sys.exit(1)
+
+        # Start the application
+        logger.info("All dependencies are satisfied. Starting the main application...")
+        window = MainWindow()
+        window.show()
+
+        # Start event loop
+        sys.exit(app.exec())
+
+    except Exception as e:
+        error_msg = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        logger.error(f"Failed to start application:\n{error_msg}")
+        show_error_dialog(
+            "Failed to start application",
+            f"Error: {str(e)}\n\nTraceback:\n{error_msg}"
+        )
         sys.exit(1)
-    
-    # Start the application
-    logger.info("All dependencies are satisfied. Starting the main application...")
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()

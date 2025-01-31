@@ -137,19 +137,26 @@ class ChatLayout(QWidget):
 
     def switch_chat(self, model_name: str):
         """Switch to the chat for the selected model"""
-        if model_name not in self.chat_displays:
-            # Create new chat display for this model
-            chat_display = ChatDisplay()
-            chat_display.add_message(f"Welcome to {model_name} chat!", False)
-            chat_display.add_message("Type your message and press Enter or click Send.", False)
-            self.chat_displays[model_name] = chat_display
-            self.chat_stack.addWidget(chat_display)
+        try:
+            if model_name not in self.chat_displays:
+                # Create new chat display for this model
+                chat_display = ChatDisplay()
+                # Add welcome messages before showing the display
+                chat_display.add_message(f"Welcome to {model_name} chat!", False)
+                chat_display.add_message("Type your message and press Enter or click Send.", False)
+                self.chat_displays[model_name] = chat_display
+                self.chat_stack.addWidget(chat_display)
 
-        # Switch to the selected chat
-        self.chat_stack.setCurrentWidget(self.chat_displays[model_name])
-        self.current_model = model_name
-        self.input_frame.show()
-        self.input_field.setPlaceholderText(f"Type your message for {model_name} here...")
+            # Switch to the selected chat
+            display = self.chat_displays[model_name]
+            if display:
+                self.chat_stack.setCurrentWidget(display)
+                self.current_model = model_name
+                self.input_frame.show()
+                self.input_field.setPlaceholderText(f"Type your message for {model_name} here...")
+                self.input_field.setFocus()
+        except Exception as e:
+            print(f"Error switching chat: {str(e)}")
 
     def send_message(self):
         """Handle sending a message"""

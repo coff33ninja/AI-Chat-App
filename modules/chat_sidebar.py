@@ -65,8 +65,12 @@ class ContactItem(QFrame):
         layout.addLayout(info_layout, stretch=1)
 
     def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        self.clicked.emit(self.model_name)
+        try:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.clicked.emit(self.model_name)
+            super().mousePressEvent(event)
+        except Exception as e:
+            print(f"Error in mousePressEvent: {str(e)}")
 
 
 class ChatSidebar(QWidget):
@@ -124,12 +128,15 @@ class ChatSidebar(QWidget):
         layout.addWidget(scroll)
         
     def populate_contacts(self):
-        for model_name in self.model_config.list_available_models():
-            model_info = self.model_config.get_model_info(model_name)
-            if model_info:
-                contact = ContactItem(
-                    model_name,
-                    model_info.get('description', 'No description available')
-                )
-                contact.clicked.connect(self.model_selected.emit)
-                self.contacts_layout.addWidget(contact)
+        try:
+            for model_name in self.model_config.list_available_models():
+                model_info = self.model_config.get_model_info(model_name)
+                if model_info:
+                    contact = ContactItem(
+                        model_name,
+                        model_info.get('description', 'No description available')
+                    )
+                    contact.clicked.connect(lambda name=model_name: self.model_selected.emit(name))
+                    self.contacts_layout.addWidget(contact)
+        except Exception as e:
+            print(f"Error populating contacts: {str(e)}")

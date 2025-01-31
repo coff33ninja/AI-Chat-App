@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QTimer, QRect
 from PyQt6.QtGui import QPalette, QColor, QPainter, QPainterPath, QResizeEvent
 from datetime import datetime
 import json
+from .worker import Worker
 
 class MessageBubble(QFrame):
     def __init__(self, text: str, timestamp: datetime, is_user: bool = False, parent=None):
@@ -264,6 +265,7 @@ class ChatDisplay(QScrollArea):
                         widget.setCompactMode(self.compact_mode)
 
     def add_message(self, text: str, is_user: bool = False):
+        """Add a message to the chat display"""
         # Get the scroll bar
         scrollbar = self.verticalScrollBar()
         if not scrollbar:
@@ -288,7 +290,49 @@ class ChatDisplay(QScrollArea):
         if scrollbar:
             scrollbar.setValue(scrollbar.maximum())
 
+    def send_message(self, text: str):
+        """Send a message and handle the response in a thread-safe way"""
+        try:
+            # Add user message to chat
+            self.add_message(text, is_user=True)
+            
+            # Show typing indicator
+            self.show_typing_indicator()
+            
+            # Create and configure worker thread
+            self.worker = Worker(text, self.current_model, self.model_config)
+            
+            # Connect signals
+            self.worker.result_ready.connect(self.handle_response)
+            self.worker.error_occurred.connect(self.handle_error)
+            self.worker.finished.connect(self.cleanup_worker)
+            
+            # Start worker thread
+            self.worker.start()
+            
+        except Exception as e:
+            self.hide_typing_indicator()
+            self.add_message(f"Error sending message: {str(e)}", is_user=False)
+            
+    def handle_response(self, response: str):
+        """Handle the response from the worker thread"""
+        self.hide_typing_indicator()
+        self.add_message(response, is_user=False)
+        
+    def handle_error(self, error_message: str):
+        """Handle any errors from the worker thread"""
+        self.hide_typing_indicator()
+        self.add_message(error_message, is_user=False)
+        
+    def cleanup_worker(self):
+        """Clean up the worker thread"""
+        if hasattr(self, 'worker'):
+            self.worker.stop()
+            self.worker.deleteLater()
+            del self.worker
+
     def show_typing_indicator(self):
+        """Show the typing indicator"""
         self.typing_indicator.setCompactMode(self.compact_mode)  # Ensure correct mode
         self.typing_indicator.start_animation()
         scrollbar = self.verticalScrollBar()
@@ -296,6 +340,7 @@ class ChatDisplay(QScrollArea):
             scrollbar.setValue(scrollbar.maximum())
 
     def hide_typing_indicator(self):
+        """Hide the typing indicator"""
         self.typing_indicator.stop_animation()
 
     def clear_messages(self):
