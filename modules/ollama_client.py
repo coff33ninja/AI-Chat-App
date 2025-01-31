@@ -1,4 +1,5 @@
 import requests
+import json
 from typing import Dict, Any, Optional, List
 from .logger_helper import get_module_logger
 
@@ -26,18 +27,41 @@ class OllamaClient:
             response = self.session.post(url, json=data, stream=True)
             response.raise_for_status()
             
-            # Stream the response and concatenate
+            # Stream and accumulate the response
             full_response = ""
-            for line in response.iter_lines():
-                if line:
+            buffer = ""
+            
+            # Set stream to False to get raw bytes
+            for chunk in response.iter_content(chunk_size=None, decode_unicode=False):
+                if chunk:
                     try:
-                        # Decode the line and parse JSON
-                        json_response = response.json()
-                        if "response" in json_response:
-                            full_response += json_response["response"]
+                        # Decode bytes to string and add to buffer
+                        buffer += chunk.decode('utf-8')
+                        
+                        # Process complete JSON objects from buffer
+                        while '\n' in buffer:
+                            line, buffer = buffer.split('\n', 1)
+                            if line.strip():
+                                try:
+                                    json_response = json.loads(line)
+                                    if "response" in json_response:
+                                        full_response += json_response["response"]
+                                except json.JSONDecodeError:
+                                    logger.warning(f"Failed to parse JSON: {line}")
+                                    continue
+                                
                     except Exception as e:
-                        # Skip lines that can't be parsed
+                        logger.error(f"Error processing chunk: {str(e)}")
                         continue
+
+            # Process any remaining data in buffer
+            if buffer.strip():
+                try:
+                    json_response = json.loads(buffer)
+                    if "response" in json_response:
+                        full_response += json_response["response"]
+                except:
+                    pass
 
             logger.info(f"Successfully generated response from {model}")
             return full_response
