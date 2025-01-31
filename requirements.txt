@@ -14,3 +14,4 @@ scipy>=1.11.0  # Scientific computing library
 python-dotenv>=1.0.0  # Environment variable management
 qt-material>=2.14  # Optional: Theming for PyQt6 UI
 regex>=2023.10.3  # Advanced regular expressions
+humanize>=4.11.0  # Human-readable time formatting

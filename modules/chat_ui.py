@@ -1,3 +1,11 @@
+def show_model_details(self):
+    """Show the model details dialog"""
+    # Check if the current model is set
+    if self.current_model:
+        # Create the model details dialog
+        dialog = ModelDetailsDialog(self.current_model, self.model_config, self)
+        # Execute the dialog
+        dialog.exec()
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
