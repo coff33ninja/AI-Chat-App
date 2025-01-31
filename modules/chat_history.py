@@ -2,10 +2,9 @@ import json
 import os
 from datetime import datetime
 from typing import List, Dict, Optional
-import logging
-import shutil
+from .logger_helper import get_module_logger
 
-logger = logging.getLogger("main.history")
+logger = get_module_logger(__name__)
 
 
 class ChatHistory:
@@ -30,40 +29,40 @@ class ChatHistory:
             "timestamp": datetime.now().isoformat(),
         }
         self.current_session.append(message)
-        logger.debug(f"Added message from {role}")
+        logger.debug(f"Added {role} message: {content[:50]}...")
 
     def save_session(self, session_name: Optional[str] = None):
         """Save current session to file"""
-        if not self.current_session or (len(self.current_session) == 1 and self.current_session[0]['content'].startswith("Welcome to")):
-            logger.debug("No meaningful messages to save")
-            return
-
-        if session_name is None:
-            session_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if not self.current_session:
+            logger.debug("No messages to save")
+            return False
 
         try:
+            if session_name is None:
+                session_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+
             filename = os.path.join(self.storage_dir, f"chat_{session_name}.json")
+            logger.info(f"Saving session to {filename}")
+
+            data = {
+                "session_name": session_name,
+                "messages": self.current_session,
+                "metadata": {
+                    "created_at": datetime.now().isoformat(),
+                    "message_count": len(self.current_session),
+                    "last_modified": datetime.now().isoformat(),
+                },
+            }
 
             with open(filename, "w", encoding="utf-8") as f:
-                json.dump(
-                    {
-                        "session_name": session_name,
-                        "messages": self.current_session,
-                        "metadata": {
-                            "created_at": datetime.now().isoformat(),
-                            "message_count": len(self.current_session),
-                            "last_modified": datetime.now().isoformat(),
-                        },
-                    },
-                    f,
-                    indent=2,
-                )
+                json.dump(data, f, indent=2)
 
             self.session_name = session_name
-            logger.info(f"Saved session to {filename}")
+            logger.info(f"Successfully saved session with {len(self.current_session)} messages")
             return True
+
         except Exception as e:
-            logger.error(f"Failed to save session: {e}")
+            logger.error(f"Failed to save session: {str(e)}", exc_info=True)
             return False
 
     def load_session(self, session_name: str) -> bool:

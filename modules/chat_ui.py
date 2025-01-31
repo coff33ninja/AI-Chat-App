@@ -7,15 +7,15 @@ def show_model_details(self):
         # Execute the dialog
         dialog.exec()
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QFrame,
-    QScrollArea,
-    QSizePolicy,
-    QScrollBar
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
+    QLineEdit, QScrollArea, QFrame, QToolButton, QMessageBox
 )
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize
+from PyQt6.QtGui import QColor
+from datetime import datetime
+from .model_config import ModelConfig
+from .worker import Worker
+from .ollama_client import OllamaClient
 from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QTimer, QRect, pyqtSignal
 from PyQt6.QtGui import QPalette, QColor, QPainter, QPainterPath
 from datetime import datetime
@@ -299,6 +299,30 @@ class ChatDisplay(QScrollArea):
         
         # Initialize model config and worker
         self.model_config = model_config
+        # Initialize model info button
+        self.model_info_button = QPushButton("Model Info")
+        self.model_info_button.setStyleSheet("""
+            QPushButton {
+                background-color: #00a884;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #008f6f;
+            }
+        """)
+        self.model_info_button.clicked.connect(self.show_model_details)
+        self.model_info_button.hide()  # Hidden by default
+        
+        # Sync models with Ollama
+        try:
+            self.model_config.sync_models()
+        except Exception as e:
+            print(f"Error syncing models: {e}")
+        
         self.current_model = None
         self.worker = None
         self.current_status = "offline"
@@ -314,6 +338,12 @@ class ChatDisplay(QScrollArea):
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setSpacing(8)
         self.content_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Add model info button to the top
+        model_info_layout = QHBoxLayout()
+        model_info_layout.addStretch()
+        model_info_layout.addWidget(self.model_info_button)
+        self.content_layout.addLayout(model_info_layout)
 
         # Status label (WhatsApp style)
         self.status_label = QLabel()
@@ -436,12 +466,85 @@ class ChatDisplay(QScrollArea):
     def set_current_model(self, model_name: str):
         """Set the current AI model"""
         self.current_model = model_name
-        model_info = self.model_config.get_model_info(model_name)
-        if model_info:
-            self.update_status("online")
-            self.add_message(
-                f"👋 Welcome! I'm {model_name}, your AI assistant.\n{model_info['description']}", 
-                is_user=False
+        
+        # Try to sync with Ollama first
+        try:
+            if self.model_config.check_ollama_available():
+                self.model_config.sync_models()
+            
+            model_info = self.model_config.get_model_info(model_name)
+            if model_info and isinstance(model_info, dict):  # Ensure model_info is a dictionary
+                self.update_status("online")
+                welcome_msg = [
+                    f"👋 Welcome! I'm {model_name}, your AI assistant.",
+                    model_info.get('description', 'No description available.')
+                ]
+                
+                # Add Ollama metadata if available
+                metadata = model_info.get('ollama_metadata', {})
+                if metadata and isinstance(metadata, dict):
+                    if metadata.get('system_prompt'):
+                        welcome_msg.append("\nSystem Prompt:")
+                        welcome_msg.append(metadata['system_prompt'])
+                
+                self.add_message("\n".join(welcome_msg), is_user=False)
+                self.model_info_button.show()
+            else:
+                self.update_status("offline")
+                self.model_info_button.hide()
+                self.add_message(f"Error: Could not load information for model {model_name}", is_user=False)
+        except Exception as e:
+            print(f"Error setting current model: {e}")
+            self.update_status("offline")
+            self.model_info_button.hide()
+            self.add_message(f"Error: Failed to initialize model {model_name}: {str(e)}", is_user=False)
+
+    def show_model_details(self):
+        """Show detailed information about the current model"""
+        if not self.current_model:
+            return
+            
+        try:
+            model_info = self.model_config.get_model_info(self.current_model)
+            if not model_info:
+                QMessageBox.warning(
+                    self,
+                    "Model Information",
+                    f"No information available for model {self.current_model}"
+                )
+                return
+                
+            # Create a formatted message with model details
+            details = [f"Model: {self.current_model}"]
+            
+            # Add description if available
+            if 'description' in model_info:
+                details.append(f"\nDescription:\n{model_info['description']}")
+            
+            # Add Ollama metadata if available
+            metadata = model_info.get('ollama_metadata', {})
+            if metadata and isinstance(metadata, dict):
+                details.append("\nModel Details:")
+                if 'parameter_size' in metadata:
+                    details.append(f"Parameter Size: {metadata['parameter_size']}")
+                if 'architecture' in metadata:
+                    details.append(f"Architecture: {metadata['architecture']}")
+                if 'license' in metadata:
+                    details.append(f"License: {metadata['license']}")
+                if 'system_prompt' in metadata:
+                    details.append(f"\nSystem Prompt:\n{metadata['system_prompt']}")
+            
+            # Show the information in a message box
+            QMessageBox.information(
+                self,
+                f"{self.current_model} Information",
+                "\n".join(details)
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to fetch model information: {str(e)}"
             )
 
     def send_message(self, text: str):

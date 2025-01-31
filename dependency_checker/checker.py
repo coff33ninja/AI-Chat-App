@@ -4,6 +4,10 @@ import importlib.util
 import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
+from modules.logger_helper import get_module_logger
+
+# Initialize module logger
+logger = get_module_logger(__name__)
 
 class ModuleChecker:
     """Class to check dependencies for a specific module"""
@@ -15,23 +19,32 @@ class ModuleChecker:
         self.required_packages = required_packages
         self.system_commands = system_commands or []
         self.additional_instructions = additional_instructions or {}
+        logger.info(f"Initializing dependency checker for {module_name}")
         
     def check_module(self, module_name: str) -> bool:
         """Check if a Python module is installed"""
-        spec = importlib.util.find_spec(module_name)
-        if spec is None:
-            print(f"❌ {module_name} is not installed")
+        try:
+            spec = importlib.util.find_spec(module_name)
+            if spec is None:
+                logger.warning(f"Module {module_name} is not installed")
+                return False
+            logger.debug(f"Module {module_name} is installed")
+            return True
+        except Exception as e:
+            logger.error(f"Error checking module {module_name}: {str(e)}")
             return False
-        print(f"✅ {module_name} is installed")
-        return True
         
     def check_command(self, command: str) -> bool:
         """Check if a command is available in PATH"""
-        if shutil.which(command) is None:
-            print(f"❌ {command} is not found in PATH")
+        try:
+            if shutil.which(command) is None:
+                logger.warning(f"Command {command} not found in PATH")
+                return False
+            logger.debug(f"Command {command} is available")
+            return True
+        except Exception as e:
+            logger.error(f"Error checking command {command}: {str(e)}")
             return False
-        print(f"✅ {command} is available")
-        return True
         
     def check(self) -> bool:
         """Check all dependencies for this module"""

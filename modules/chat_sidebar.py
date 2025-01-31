@@ -187,31 +187,35 @@ class ChatSidebar(QWidget):
         header_buttons = QHBoxLayout()
         header_buttons.setSpacing(8)
         
-        # Status button
-        status_btn = QToolButton()
-        status_btn.setIcon(QIcon("assets/status.png"))  # Add your icon
-        status_btn.setIconSize(QSize(24, 24))
-        status_btn.setStyleSheet("""
+        # Refresh button
+        refresh_btn = QToolButton()
+        refresh_btn.setText("🔄")  # Using emoji instead of icon
+        refresh_btn.setIconSize(QSize(24, 24))
+        refresh_btn.setToolTip("Refresh Models")
+        refresh_btn.setStyleSheet("""
             QToolButton {
                 border: none;
                 padding: 8px;
                 border-radius: 20px;
+                font-size: 16px;
             }
             QToolButton:hover {
                 background-color: #e9edef;
             }
         """)
-        header_buttons.addWidget(status_btn)
+        refresh_btn.clicked.connect(self.refresh_contacts)
+        header_buttons.addWidget(refresh_btn)
         
         # New chat button
         new_chat_btn = QToolButton()
-        new_chat_btn.setIcon(QIcon("assets/new-chat.png"))  # Add your icon
+        new_chat_btn.setText("➕")  # Using emoji instead of icon
         new_chat_btn.setIconSize(QSize(24, 24))
         new_chat_btn.setStyleSheet("""
             QToolButton {
                 border: none;
                 padding: 8px;
                 border-radius: 20px;
+                font-size: 16px;
             }
             QToolButton:hover {
                 background-color: #e9edef;
@@ -221,13 +225,14 @@ class ChatSidebar(QWidget):
         
         # Menu button
         menu_btn = QToolButton()
-        menu_btn.setIcon(QIcon("assets/menu.png"))  # Add your icon
+        menu_btn.setText("⋮")  # Using dots instead of icon
         menu_btn.setIconSize(QSize(24, 24))
         menu_btn.setStyleSheet("""
             QToolButton {
                 border: none;
                 padding: 8px;
                 border-radius: 20px;
+                font-size: 16px;
             }
             QToolButton:hover {
                 background-color: #e9edef;
@@ -312,7 +317,15 @@ class ChatSidebar(QWidget):
         layout.addWidget(scroll)
         
     def populate_contacts(self):
+        """Populate the sidebar with available models"""
         try:
+            # Clear existing contacts first
+            while self.contacts_layout.count() > 0:
+                item = self.contacts_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+
+            # Add model contacts
             for model_name in self.model_config.list_available_models():
                 model_info = self.model_config.get_model_info(model_name)
                 if model_info:
@@ -322,5 +335,19 @@ class ChatSidebar(QWidget):
                     )
                     contact.clicked.connect(lambda name=model_name: self.model_selected.emit(name))
                     self.contacts_layout.addWidget(contact)
+
+            # Add stretch at the bottom
+            self.contacts_layout.addStretch()
         except Exception as e:
             print(f"Error populating contacts: {str(e)}")
+
+    def refresh_contacts(self):
+        """Refresh the contacts list"""
+        try:
+            # Sync models first
+            if self.model_config.check_ollama_available():
+                self.model_config.sync_models()
+            # Repopulate contacts
+            self.populate_contacts()
+        except Exception as e:
+            print(f"Error refreshing contacts: {str(e)}")

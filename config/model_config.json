@@ -1,0 +1,79 @@
+{
+    "llama2": {
+        "name": "llama2",
+        "description": "Llama 2 is a state-of-the-art large language model.",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    },
+    "mistral": {
+        "name": "mistral",
+        "description": "Mistral is an efficient and powerful language model.",
+        "context_length": 8192,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    },
+    "mistral:latest": {
+        "name": "mistral:latest",
+        "description": "No description available",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    },
+    "deepseek-r1:latest": {
+        "name": "deepseek-r1:latest",
+        "description": "No description available",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    },
+    "deepseek-coder:latest": {
+        "name": "deepseek-coder:latest",
+        "description": "No description available",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    },
+    "codegemma:2b": {
+        "name": "codegemma:2b",
+        "description": "No description available",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    },
+    "gemma:2b": {
+        "name": "gemma:2b",
+        "description": "No description available",
+        "context_length": 4096,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1
+        }
+    }
+}

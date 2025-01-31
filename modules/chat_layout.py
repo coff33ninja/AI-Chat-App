@@ -21,6 +21,7 @@ from .speech_module import SpeechHandler
 import json
 import os
 from datetime import datetime
+from typing import Dict, Optional
 
 
 class ChatLayout(QWidget):
@@ -31,6 +32,7 @@ class ChatLayout(QWidget):
         self.current_model = None
         self.sidebar_visible = True
         self.speech_handler = SpeechHandler(self)
+        self.current_worker: Optional[Worker] = None  # Track current worker
         self.setup_ui()
 
     def setup_ui(self):
@@ -132,7 +134,6 @@ class ChatLayout(QWidget):
         tts_controls.addWidget(self.stop_button)
 
         header_buttons.addLayout(tts_controls)
-
 
         # More options button
         more_btn = QToolButton()
@@ -252,6 +253,75 @@ class ChatLayout(QWidget):
         chat_layout.addWidget(self.input_frame)
         layout.addWidget(chat_container, stretch=1)
 
+    def cleanup_worker(self):
+        """Clean up the current worker thread"""
+        if self.current_worker:
+            try:
+                self.current_worker.stop()  # Stop the worker
+                self.current_worker.wait()  # Wait for it to finish
+                self.current_worker.deleteLater()  # Schedule for deletion
+                self.current_worker = None
+            except Exception as e:
+                print(f"Error cleaning up worker: {str(e)}")
+
+    def send_message(self):
+        """Handle sending a message"""
+        if not self.current_model:
+            return
+
+        text = self.input_field.text().strip()
+        if not text:
+            return
+
+        chat_display = self.chat_displays[self.current_model]
+        self.input_field.clear()
+
+        # Display user message
+        chat_display.add_message(text, True)
+
+        # Show typing indicator
+        chat_display.show_typing_indicator()
+
+        # Stop any existing worker
+        self.cleanup_worker()
+
+        # Start new worker thread
+        self.current_worker = Worker(text, self.current_model, self.model_config)
+        self.current_worker.result_ready.connect(self.handle_response)
+        self.current_worker.error_occurred.connect(self.handle_error)
+        self.current_worker.start()
+
+    def handle_response(self, response: str):
+        """Handle AI response"""
+        if not self.current_model or self.current_model not in self.chat_displays:
+            return
+
+        chat_display = self.chat_displays[self.current_model]
+        chat_display.hide_typing_indicator()
+        chat_display.add_message(response, False)
+
+        # If TTS is enabled, speak the response
+        if self.tts_toggle.isChecked():
+            self.speaking_indicator.setText("Speaking...")
+            self.stop_button.setEnabled(True)
+            self.speech_handler.text_to_speech(response, "pyttsx3 (System)", 
+                callback=lambda: self.speaking_indicator.setText("TTS Ready"))
+
+        # Cleanup worker after successful response
+        self.cleanup_worker()
+
+    def handle_error(self, error: str):
+        """Handle error from worker thread"""
+        if not self.current_model or self.current_model not in self.chat_displays:
+            return
+
+        chat_display = self.chat_displays[self.current_model]
+        chat_display.hide_typing_indicator()
+        chat_display.add_message(f"Error: {error}", False)
+        
+        # Cleanup worker after error
+        self.cleanup_worker()
+
     def toggle_tts(self, enabled: bool):
         """Toggle text-to-speech functionality"""
         if enabled:
@@ -268,7 +338,6 @@ class ChatLayout(QWidget):
         self.speech_handler.stop_speaking()
         self.speaking_indicator.setText("")
         self.stop_button.setEnabled(False)
-
 
     def start_voice_input(self):
         """Start recording voice input"""
@@ -293,10 +362,13 @@ class ChatLayout(QWidget):
     def switch_chat(self, model_name: str):
         """Switch to the chat for the selected model"""
         try:
+            # Cleanup current worker before switching
+            self.cleanup_worker()
+
             if model_name not in self.chat_displays:
-                # Create new chat display for this model with model_config
+                # Create new chat display for this model
                 chat_display = ChatDisplay(model_config=self.model_config)
-                chat_display.set_current_model(model_name)  # This will handle the welcome message
+                chat_display.set_current_model(model_name)
                 self.chat_displays[model_name] = chat_display
                 self.chat_stack.addWidget(chat_display)
 
@@ -305,59 +377,22 @@ class ChatLayout(QWidget):
             if display:
                 self.chat_stack.setCurrentWidget(display)
                 self.current_model = model_name
-                self.header_title.setText(model_name)  # Update header title
+                self.header_title.setText(model_name)
                 self.input_frame.show()
                 self.input_field.setPlaceholderText(f"Message {model_name}")
                 self.input_field.setFocus()
         except Exception as e:
             print(f"Error switching chat: {str(e)}")
 
-    def send_message(self):
-        """Handle sending a message"""
-        if not self.current_model:
-            return
-
-        text = self.input_field.text().strip()
-        if not text:
-            return
-
-        chat_display = self.chat_displays[self.current_model]
-        self.input_field.clear()
-
-        # Display user message
-        chat_display.add_message(text, True)
-
-        # Show typing indicator
-        chat_display.show_typing_indicator()
-
-        # Start worker thread
-        worker = Worker(text, self.current_model, self.model_config)
-        worker.result_ready.connect(lambda response: self.handle_response(response))
-        worker.start()
-
-    def handle_response(self, response: str):
-        """Handle AI response"""
-        if not self.current_model or self.current_model not in self.chat_displays:
-            return
-
-        chat_display = self.chat_displays[self.current_model]
-        chat_display.hide_typing_indicator()
-        chat_display.add_message(response, False)
-
-        # If TTS is enabled, speak the response
-        if self.tts_toggle.isChecked():
-            self.speaking_indicator.setText("Speaking...")
-            self.stop_button.setEnabled(True)
-            self.speech_handler.text_to_speech(response, "pyttsx3 (System)", 
-                callback=lambda: self.speaking_indicator.setText("TTS Ready"))
-
-
     def new_chat(self):
         """Create a new chat session"""
         if self.current_model:
-            # Create new chat display for current model with model_config
+            # Cleanup current worker before creating new chat
+            self.cleanup_worker()
+            
+            # Create new chat display for current model
             chat_display = ChatDisplay(model_config=self.model_config)
-            chat_display.set_current_model(self.current_model)  # This will handle the welcome message
+            chat_display.set_current_model(self.current_model)
 
             # Replace existing chat display
             old_display = self.chat_displays[self.current_model]
@@ -414,9 +449,12 @@ class ChatLayout(QWidget):
                 if not model_name:
                     raise ValueError("Invalid chat file: missing model name")
 
-                # Create new chat display with model_config
+                # Cleanup current worker before loading chat
+                self.cleanup_worker()
+
+                # Create new chat display
                 chat_display = ChatDisplay(model_config=self.model_config)
-                chat_display.set_current_model(model_name)  # Set the model first
+                chat_display.set_current_model(model_name)
                 chat_display.set_chat_name(chat_data.get("name", "Loaded Chat"))
 
                 # Load messages
@@ -435,7 +473,7 @@ class ChatLayout(QWidget):
                 self.current_model = model_name
                 self.chat_stack.setCurrentWidget(chat_display)
                 self.input_frame.show()
-                self.header_title.setText(model_name)  # Update header title
+                self.header_title.setText(model_name)
 
                 QMessageBox.information(self, "Success", "Chat history loaded successfully!")
             except Exception as e:
@@ -473,6 +511,9 @@ class ChatLayout(QWidget):
     def clear_chat(self):
         """Clear current chat"""
         if self.current_model and self.current_model in self.chat_displays:
+            # Cleanup current worker before clearing chat
+            self.cleanup_worker()
+            
             chat_display = self.chat_displays[self.current_model]
             chat_display.clear_messages()
             chat_display.add_message(f"👋 Welcome! I'm {self.current_model}, your AI assistant.", False)
@@ -483,9 +524,14 @@ class ChatLayout(QWidget):
         if self.current_model and self.current_model in self.chat_displays:
             chat_display = self.chat_displays[self.current_model]
             chat_display.set_chat_name(new_name)
-            self.header_title.setText(new_name)  # Update header title
+            self.header_title.setText(new_name)
 
     def toggle_sidebar(self):
         """Toggle sidebar visibility"""
         self.sidebar_visible = not self.sidebar_visible
         self.sidebar.setVisible(self.sidebar_visible)
+
+    def closeEvent(self, event):
+        """Handle widget closure"""
+        self.cleanup_worker()  # Ensure worker is cleaned up
+        super().closeEvent(event)
