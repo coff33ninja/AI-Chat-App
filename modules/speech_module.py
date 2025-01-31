@@ -6,25 +6,51 @@ import wave
 import numpy as np
 import logging
 import unicodedata
+import string
 
 # Get logger for speech module
 logger = logging.getLogger("main.speech")
 
+# Define valid characters (ASCII printable characters)
+VALID_CHARS = set(string.printable)
+
 # Character replacement map for common problematic Unicode characters
 CHAR_REPLACEMENTS = {
-    '\u0254': 'o',  # Open O -> o
-    '\u028a': 'u',  # Upsilon -> u
-    '\u0259': 'e',  # Schwa -> e
-    '\u025b': 'e',  # Open E -> e
-    '\u0251': 'a',  # Script A -> a
-    '\u0252': 'a',  # Turned Alpha -> a
-    '\u026a': 'i',  # Small Capital I -> i
-    '\u0283': 'sh', # Esh -> sh
-    '\u027e': 'r',  # R with Fishhook -> r
-    '\u0292': 'zh', # Ezh -> zh
-    '\u03b8': 'th', # Theta -> th
-    '\u00f0': 'th', # Eth -> th
-    '\u014b': 'ng', # Eng -> ng
+    # Vowels
+    '\u0254': 'o',  # Open O
+    '\u028a': 'u',  # Upsilon
+    '\u0259': 'e',  # Schwa
+    '\u025b': 'e',  # Open E
+    '\u0251': 'a',  # Script A
+    '\u0252': 'a',  # Turned Alpha
+    '\u026a': 'i',  # Small Capital I
+    '\u0268': 'i',  # Small Capital I
+    '\u0289': 'u',  # U bar
+    '\u028c': 'v',  # Turned V
+    '\u0275': 'o',  # Barred O
+    '\u0264': 'g',  # Small Capital G
+    
+    # Consonants
+    '\u0283': 'sh',  # Esh
+    '\u027e': 'r',   # R with Fishhook
+    '\u0292': 'zh',  # Ezh
+    '\u03b8': 'th',  # Theta
+    '\u00f0': 'th',  # Eth
+    '\u014b': 'ng',  # Eng
+    '\u0279': 'r',   # Turned R
+    '\u0288': 't',   # Turned T
+    '\u0256': 'd',   # Turned D
+    '\u0273': 'n',   # N with retroflex hook
+    '\u0272': 'n',   # N with left hook
+    
+    # Additional common characters
+    '\u2019': "'",   # Right single quotation mark
+    '\u2018': "'",   # Left single quotation mark
+    '\u201c': '"',   # Left double quotation mark
+    '\u201d': '"',   # Right double quotation mark
+    '\u2013': '-',   # En dash
+    '\u2014': '--',  # Em dash
+    '\u00a0': ' ',   # Non-breaking space
 }
 
 # Optional imports with fallbacks
@@ -103,23 +129,32 @@ class SpeechHandler:
     def _sanitize_text(self, text):
         """Enhanced text sanitization for TTS processing"""
         try:
-            # First, replace known problematic characters
+            # Store original text for logging
+            original_text = text
+            
+            # Step 1: Replace known problematic characters
             for char, replacement in CHAR_REPLACEMENTS.items():
                 if char in text:
                     text = text.replace(char, replacement)
-                    logger.debug(f"Replaced character {char} with {replacement}")
+                    logger.debug(f"Replaced character {repr(char)} with {repr(replacement)}")
 
-            # Then normalize remaining Unicode characters
-            normalized = unicodedata.normalize('NFKD', text)
+            # Step 2: Normalize Unicode characters
+            text = unicodedata.normalize('NFKD', text)
             
-            # Convert to ASCII, ignoring non-ASCII characters
-            sanitized = normalized.encode('ascii', 'ignore').decode('ascii')
+            # Step 3: Build sanitized text using only valid characters
+            sanitized = ''.join(c for c in text if c in VALID_CHARS)
             
-            # Log any remaining characters that were removed
-            if sanitized != text:
-                removed_chars = set(c for c in text if c not in sanitized and c not in CHAR_REPLACEMENTS)
+            # Log changes if any were made
+            if sanitized != original_text:
+                # Find and log all characters that were removed
+                removed_chars = set()
+                for i, char in enumerate(original_text):
+                    if char not in VALID_CHARS and char not in CHAR_REPLACEMENTS:
+                        removed_chars.add(repr(char))
+                
                 if removed_chars:
-                    logger.debug(f"Removed unsupported characters: {removed_chars}")
+                    logger.debug(f"Removed unsupported characters: {', '.join(removed_chars)}")
+                logger.debug(f"Text sanitized from: {repr(original_text[:50])}... to: {repr(sanitized[:50])}...")
             
             return sanitized
             
@@ -146,8 +181,6 @@ class SpeechHandler:
         text = re.sub(r"<.*?>", "", text).strip()
         original_text = text
         text = self._sanitize_text(text)
-        if text != original_text:
-            logger.debug(f"Text sanitized from: {original_text[:50]}... to: {text[:50]}...")
 
         try:
             if method == "pyttsx3 (System)" and PYTTSX3_AVAILABLE:
@@ -192,8 +225,9 @@ class SpeechHandler:
             
             # Enhanced error logging for character encoding issues
             if "charmap" in str(e):
-                logger.error(f"Character encoding error in TTS. Original text: {original_text}")
-                logger.error(f"Sanitized text: {text}")
+                logger.error(f"Character encoding error in TTS.")
+                logger.error(f"Original text: {repr(original_text)}")
+                logger.error(f"Sanitized text: {repr(text)}")
                 logger.error(f"Error details: {str(e)}")
             else:
                 logger.error(f"TTS error: {str(e)}")
