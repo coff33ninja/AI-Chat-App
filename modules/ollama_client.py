@@ -1,6 +1,7 @@
 import requests
 import json
 import logging
+import subprocess
 from typing import Dict, Optional
 
 logger = logging.getLogger("main.ollama")
@@ -12,26 +13,38 @@ class OllamaClient:
         self.base_url = base_url
         self.session = requests.Session()
         
-    def generate_response(self, messages: list) -> Optional[str]:
-        """Generate a response using the chat completion API"""
+    def run_cli(self, model: str, prompt: str) -> Optional[str]:
+        """Run the Ollama CLI command"""
         try:
-            url = f"{self.base_url}/api/chat"
+            command = f"ollama run {model} \"{prompt}\""
+            logger.debug(f"Running CLI command: {command}")
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                logger.error(f"CLI command failed: {result.stderr.strip()}")
+                return None
+        except Exception as e:
+            logger.error(f"Error running CLI command: {str(e)}")
+            return None
+
+    def generate_response(self, model: str, prompt: str) -> Optional[str]:
+        """Generate a response using the specified model via the API"""
+        try:
+            url = f"{self.base_url}/api/generate"
             
-            # Prepare request payload for chat completion
+            # Prepare request payload
             payload = {
-                "model": messages[0].get("model", "llama2"),
-                "messages": messages,
-                "stream": False
+                "model": model,
+                "prompt": prompt
             }
-                
-            logger.debug(f"Sending chat request to Ollama API")
+            
+            logger.debug(f"Sending request to Ollama API for model {model}")
             response = self.session.post(url, json=payload)
             response.raise_for_status()
             
             data = response.json()
-            if "message" in data:
-                return data["message"]["content"]
-            return "Error: Unexpected response format"
+            return data.get("response", "").strip()
             
         except requests.exceptions.ConnectionError:
             logger.error("Failed to connect to Ollama service")
@@ -45,25 +58,3 @@ class OllamaClient:
         except Exception as e:
             logger.error(f"Unexpected error in Ollama client: {str(e)}")
             raise
-            
-    def list_models(self) -> list:
-        """Get list of available models"""
-        try:
-            url = f"{self.base_url}/api/tags"
-            response = self.session.get(url)
-            response.raise_for_status()
-            
-            data = response.json()
-            return [model["name"] for model in data.get("models", [])]
-            
-        except Exception as e:
-            logger.error(f"Error listing models: {str(e)}")
-            return []
-            
-    def check_model_exists(self, model_name: str) -> bool:
-        """Check if a model exists"""
-        try:
-            models = self.list_models()
-            return model_name in models
-        except:
-            return False

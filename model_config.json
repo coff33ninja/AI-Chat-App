@@ -1,38 +1,127 @@
 {
-    "deepseek-coder": {
-        "name": "deepseek-coder",
-        "description": "Code-specialized model",
+    "mistral:latest": {
+        "name": "mistral:latest",
+        "description": "Llama family | 7.2B parameters | Q4_0 quantization",
         "context_length": 8192,
         "parameters": {
             "temperature": 0.7,
-            "top_p": 0.95
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1,
+            "stop": [
+                "User:",
+                "Assistant:"
+            ]
+        },
+        "details": {
+            "parent_model": "",
+            "format": "gguf",
+            "family": "llama",
+            "families": [
+                "llama"
+            ],
+            "parameter_size": "7.2B",
+            "quantization_level": "Q4_0"
         }
     },
-    "deepseek-r1": {
-        "name": "deepseek-r1",
-        "description": "General purpose model",
-        "context_length": 4096,
+    "deepseek-r1:latest": {
+        "name": "deepseek-r1:latest",
+        "description": "Qwen2 family | 7.6B parameters | Q4_K_M quantization",
+        "context_length": 8192,
         "parameters": {
             "temperature": 0.7,
-            "top_p": 0.95
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1,
+            "stop": [
+                "User:",
+                "Assistant:"
+            ]
+        },
+        "details": {
+            "parent_model": "",
+            "format": "gguf",
+            "family": "qwen2",
+            "families": [
+                "qwen2"
+            ],
+            "parameter_size": "7.6B",
+            "quantization_level": "Q4_K_M"
         }
     },
-    "mistral": {
-        "name": "mistral",
-        "description": "Balanced model",
-        "context_length": 4096,
+    "deepseek-coder:latest": {
+        "name": "deepseek-coder:latest",
+        "description": "Llama family | 1B parameters | Q4_0 quantization",
+        "context_length": 8192,
         "parameters": {
             "temperature": 0.7,
-            "top_p": 0.95
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1,
+            "stop": [
+                "User:",
+                "Assistant:"
+            ]
+        },
+        "details": {
+            "parent_model": "",
+            "format": "gguf",
+            "family": "llama",
+            "families": [
+                "llama"
+            ],
+            "parameter_size": "1B",
+            "quantization_level": "Q4_0"
         }
     },
-    "llama2": {
-        "name": "llama2",
-        "description": "General purpose model",
-        "context_length": 4096,
+    "codegemma:2b": {
+        "name": "codegemma:2b",
+        "description": "Gemma family | 3B parameters | Q4_0 quantization",
+        "context_length": 8192,
         "parameters": {
             "temperature": 0.7,
-            "top_p": 0.95
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1,
+            "stop": [
+                "User:",
+                "Assistant:"
+            ]
+        },
+        "details": {
+            "parent_model": "",
+            "format": "gguf",
+            "family": "gemma",
+            "families": [
+                "gemma"
+            ],
+            "parameter_size": "3B",
+            "quantization_level": "Q4_0"
+        }
+    },
+    "gemma:2b": {
+        "name": "gemma:2b",
+        "description": "Gemma family | 3B parameters | Q4_0 quantization",
+        "context_length": 8192,
+        "parameters": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "repeat_penalty": 1.1,
+            "stop": [
+                "User:",
+                "Assistant:"
+            ]
+        },
+        "details": {
+            "parent_model": "",
+            "format": "gguf",
+            "family": "gemma",
+            "families": [
+                "gemma"
+            ],
+            "parameter_size": "3B",
+            "quantization_level": "Q4_0"
         }
     }
 }

@@ -8,13 +8,16 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QFileDialog,
-    QMessageBox
+    QMessageBox,
+    QToolButton
 )
 from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QIcon
 from .chat_ui import ChatDisplay
 from .chat_sidebar import ChatSidebar
 from .model_config import ModelConfig
 from .worker import Worker
+from .speech_module import SpeechHandler
 import json
 import os
 from datetime import datetime
@@ -27,6 +30,7 @@ class ChatLayout(QWidget):
         self.chat_displays = {}  # Store chat displays for each model
         self.current_model = None
         self.sidebar_visible = True
+        self.speech_handler = SpeechHandler(self)
         self.setup_ui()
 
     def setup_ui(self):
@@ -46,9 +50,117 @@ class ChatLayout(QWidget):
         chat_layout.setContentsMargins(0, 0, 0, 0)
         chat_layout.setSpacing(0)
 
+        # Chat header
+        header = QFrame()
+        header.setStyleSheet("""
+            QFrame {
+                background-color: #f0f2f5;
+                border-bottom: 1px solid #d1d7db;
+            }
+        """)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(16, 10, 16, 10)
+
+        # Model info in header
+        self.header_title = QLabel("Welcome to AI Chat")
+        self.header_title.setStyleSheet("""
+            color: #111b21;
+            font-size: 16px;
+            font-weight: bold;
+        """)
+        header_layout.addWidget(self.header_title)
+
+        # Header buttons
+        header_buttons = QHBoxLayout()
+        header_buttons.setSpacing(8)
+
+        # TTS controls
+        tts_controls = QHBoxLayout()
+        tts_controls.setSpacing(4)
+
+        # TTS toggle button
+        self.tts_toggle = QToolButton()
+        self.tts_toggle.setText("🔊")
+        self.tts_toggle.setCheckable(True)
+        self.tts_toggle.setToolTip("Toggle Text-to-Speech")
+        self.tts_toggle.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 20px;
+                font-size: 16px;
+            }
+            QToolButton:hover {
+                background-color: #e9edef;
+            }
+            QToolButton:checked {
+                background-color: #128C7E;
+                color: white;
+            }
+        """)
+        self.tts_toggle.clicked.connect(self.toggle_tts)
+        tts_controls.addWidget(self.tts_toggle)
+
+        # Speaking indicator
+        self.speaking_indicator = QLabel("")
+        self.speaking_indicator.setStyleSheet("""
+            QLabel {
+                color: #8696a0;
+                font-size: 13px;
+                margin-left: 4px;
+            }
+        """)
+        tts_controls.addWidget(self.speaking_indicator)
+
+        # Stop button
+        self.stop_button = QPushButton("Stop")
+        self.stop_button.setEnabled(False)
+        self.stop_button.clicked.connect(self.stop_speaking)
+        self.stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #DC3545;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 5px 10px;
+            }
+            QPushButton:disabled {
+                background-color: #CCCCCC;
+            }
+        """)
+        self.stop_button.hide()
+        tts_controls.addWidget(self.stop_button)
+
+        header_buttons.addLayout(tts_controls)
+
+
+        # More options button
+        more_btn = QToolButton()
+        more_btn.setText("⋮")  # Using dots instead of icon
+        more_btn.setIconSize(QSize(24, 24))
+        more_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 20px;
+                font-size: 16px;
+            }
+            QToolButton:hover {
+                background-color: #e9edef;
+            }
+        """)
+        header_buttons.addWidget(more_btn)
+
+        header_layout.addLayout(header_buttons)
+        chat_layout.addWidget(header)
+
         # Stacked widget for different chats
         self.chat_stack = QStackedWidget()
-        self.chat_stack.setStyleSheet("background-color: #E5DDD5;")
+        self.chat_stack.setStyleSheet("""
+            QStackedWidget {
+                background-color: #efeae2;
+            }
+        """)
 
         # Welcome screen
         welcome_widget = QWidget()
@@ -58,7 +170,7 @@ class ChatLayout(QWidget):
         welcome_label = QLabel("👋 Welcome to AI Chat!")
         welcome_label.setStyleSheet("""
             QLabel {
-                color: #000000;
+                color: #111b21;
                 font-size: 24px;
                 font-weight: bold;
             }
@@ -68,7 +180,7 @@ class ChatLayout(QWidget):
         instruction_label = QLabel("Select an AI model from the sidebar to start chatting")
         instruction_label.setStyleSheet("""
             QLabel {
-                color: #000000;
+                color: #667781;
                 font-size: 16px;
             }
         """)
@@ -81,69 +193,110 @@ class ChatLayout(QWidget):
         self.input_frame = QFrame()
         self.input_frame.setStyleSheet("""
             QFrame {
-                background-color: #F0F0F0;
-                border-top: 1px solid #CCCCCC;
+                background-color: #f0f2f5;
+                border-top: 1px solid #d1d7db;
+                padding: 5px;
             }
         """)
         self.input_frame.hide()
 
         input_layout = QHBoxLayout(self.input_frame)
-        input_layout.setContentsMargins(10, 10, 10, 10)
+        input_layout.setContentsMargins(16, 10, 16, 10)
+        input_layout.setSpacing(8)
 
+        # Input field
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Type your message here...")
+        self.input_field.setPlaceholderText("Type a message")
         self.input_field.setStyleSheet("""
             QLineEdit {
-                border: 1px solid #CCCCCC;
-                border-radius: 20px;
-                padding: 8px 16px;
+                border: none;
+                border-radius: 8px;
+                padding: 9px 12px;
                 background-color: white;
-                min-height: 24px;
-                color: #000000;
+                font-size: 15px;
+                color: #111b21;
             }
             QLineEdit:focus {
-                border: 1px solid #128C7E;
+                outline: none;
             }
             QLineEdit::placeholder {
-                color: #666666;
+                color: #8696a0;
             }
         """)
         self.input_field.returnPressed.connect(self.send_message)
         input_layout.addWidget(self.input_field)
 
-        self.send_button = QPushButton("Send")
-        self.send_button.setStyleSheet("""
-            QPushButton {
+        # Voice input button
+        self.voice_input_btn = QToolButton()
+        self.voice_input_btn.setText("🎙️")
+        self.voice_input_btn.setToolTip("Hold to record voice input")
+        self.voice_input_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 20px;
+                font-size: 16px;
+            }
+            QToolButton:hover {
+                background-color: #e9edef;
+            }
+            QToolButton:pressed {
                 background-color: #128C7E;
                 color: white;
-                border: none;
-                border-radius: 15px;
-                padding: 8px 16px;
-                min-width: 70px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #075E54;
-            }
-            QPushButton:pressed {
-                background-color: #0E7165;
             }
         """)
-        self.send_button.clicked.connect(self.send_message)
-        input_layout.addWidget(self.send_button)
+        self.voice_input_btn.pressed.connect(self.start_voice_input)
+        self.voice_input_btn.released.connect(self.stop_voice_input)
+        input_layout.addWidget(self.voice_input_btn)
 
         chat_layout.addWidget(self.input_frame)
         layout.addWidget(chat_container, stretch=1)
+
+    def toggle_tts(self, enabled: bool):
+        """Toggle text-to-speech functionality"""
+        if enabled:
+            self.speaking_indicator.setText("TTS Enabled")
+            self.stop_button.show()
+            self.speech_handler.text_to_speech("Text-to-speech enabled", "pyttsx3 (System)")
+        else:
+            self.speaking_indicator.setText("")
+            self.stop_button.hide()
+            self.speech_handler.stop_speaking()
+
+    def stop_speaking(self):
+        """Stop current TTS playback"""
+        self.speech_handler.stop_speaking()
+        self.speaking_indicator.setText("")
+        self.stop_button.setEnabled(False)
+
+
+    def start_voice_input(self):
+        """Start recording voice input"""
+        self.voice_input_btn.setToolTip("Recording... Release to stop")
+        self.speech_handler.start_listening(
+            duration=5,
+            callback=self.handle_voice_input
+        )
+
+    def stop_voice_input(self):
+        """Stop recording voice input"""
+        self.voice_input_btn.setToolTip("Hold to record voice input")
+
+    def handle_voice_input(self, **kwargs):
+        """Handle voice input results"""
+        if 'error' in kwargs:
+            QMessageBox.warning(self, "Voice Input Error", kwargs['error'])
+        elif 'text' in kwargs:
+            self.input_field.setText(kwargs['text'])
+            self.send_message()
 
     def switch_chat(self, model_name: str):
         """Switch to the chat for the selected model"""
         try:
             if model_name not in self.chat_displays:
-                # Create new chat display for this model
-                chat_display = ChatDisplay()
-                # Add welcome messages before showing the display
-                chat_display.add_message(f"Welcome to {model_name} chat!", False)
-                chat_display.add_message("Type your message and press Enter or click Send.", False)
+                # Create new chat display for this model with model_config
+                chat_display = ChatDisplay(model_config=self.model_config)
+                chat_display.set_current_model(model_name)  # This will handle the welcome message
                 self.chat_displays[model_name] = chat_display
                 self.chat_stack.addWidget(chat_display)
 
@@ -152,8 +305,9 @@ class ChatLayout(QWidget):
             if display:
                 self.chat_stack.setCurrentWidget(display)
                 self.current_model = model_name
+                self.header_title.setText(model_name)  # Update header title
                 self.input_frame.show()
-                self.input_field.setPlaceholderText(f"Type your message for {model_name} here...")
+                self.input_field.setPlaceholderText(f"Message {model_name}")
                 self.input_field.setFocus()
         except Exception as e:
             print(f"Error switching chat: {str(e)}")
@@ -190,13 +344,20 @@ class ChatLayout(QWidget):
         chat_display.hide_typing_indicator()
         chat_display.add_message(response, False)
 
+        # If TTS is enabled, speak the response
+        if self.tts_toggle.isChecked():
+            self.speaking_indicator.setText("Speaking...")
+            self.stop_button.setEnabled(True)
+            self.speech_handler.text_to_speech(response, "pyttsx3 (System)", 
+                callback=lambda: self.speaking_indicator.setText("TTS Ready"))
+
+
     def new_chat(self):
         """Create a new chat session"""
         if self.current_model:
-            # Create new chat display for current model
-            chat_display = ChatDisplay()
-            chat_display.add_message(f"Welcome to {self.current_model} chat!", False)
-            chat_display.add_message("Type your message and press Enter or click Send.", False)
+            # Create new chat display for current model with model_config
+            chat_display = ChatDisplay(model_config=self.model_config)
+            chat_display.set_current_model(self.current_model)  # This will handle the welcome message
 
             # Replace existing chat display
             old_display = self.chat_displays[self.current_model]
@@ -253,8 +414,9 @@ class ChatLayout(QWidget):
                 if not model_name:
                     raise ValueError("Invalid chat file: missing model name")
 
-                # Create new chat display
-                chat_display = ChatDisplay()
+                # Create new chat display with model_config
+                chat_display = ChatDisplay(model_config=self.model_config)
+                chat_display.set_current_model(model_name)  # Set the model first
                 chat_display.set_chat_name(chat_data.get("name", "Loaded Chat"))
 
                 # Load messages
@@ -273,6 +435,7 @@ class ChatLayout(QWidget):
                 self.current_model = model_name
                 self.chat_stack.setCurrentWidget(chat_display)
                 self.input_frame.show()
+                self.header_title.setText(model_name)  # Update header title
 
                 QMessageBox.information(self, "Success", "Chat history loaded successfully!")
             except Exception as e:
@@ -312,14 +475,15 @@ class ChatLayout(QWidget):
         if self.current_model and self.current_model in self.chat_displays:
             chat_display = self.chat_displays[self.current_model]
             chat_display.clear_messages()
-            chat_display.add_message(f"Welcome to {self.current_model} chat!", False)
-            chat_display.add_message("Type your message and press Enter or click Send.", False)
+            chat_display.add_message(f"👋 Welcome! I'm {self.current_model}, your AI assistant.", False)
+            chat_display.add_message("How can I help you today?", False)
 
     def rename_chat(self, new_name: str):
         """Rename current chat"""
         if self.current_model and self.current_model in self.chat_displays:
             chat_display = self.chat_displays[self.current_model]
             chat_display.set_chat_name(new_name)
+            self.header_title.setText(new_name)  # Update header title
 
     def toggle_sidebar(self):
         """Toggle sidebar visibility"""

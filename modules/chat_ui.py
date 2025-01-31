@@ -8,11 +8,13 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QScrollBar
 )
-from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QTimer, QRect
-from PyQt6.QtGui import QPalette, QColor, QPainter, QPainterPath, QResizeEvent
+from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QTimer, QRect, pyqtSignal
+from PyQt6.QtGui import QPalette, QColor, QPainter, QPainterPath
 from datetime import datetime
 import json
 from .worker import Worker
+from .speech_module import SpeechHandler
+from .model_config import ModelConfig
 
 class MessageBubble(QFrame):
     def __init__(self, text: str, timestamp: datetime, is_user: bool = False, parent=None):
@@ -34,15 +36,23 @@ class MessageBubble(QFrame):
         message_layout = QVBoxLayout(message_frame)
         message_layout.setSpacing(2)
 
-        # Message text
+        # Message text with emoji support
         text_label = QLabel(text)
         text_label.setWordWrap(True)
-        text_label.setTextFormat(Qt.TextFormat.PlainText)
+        text_label.setTextFormat(Qt.TextFormat.RichText)  # Enable rich text for emoji
+        text_label.setOpenExternalLinks(True)  # Make links clickable
         message_layout.addWidget(text_label)
 
-        # Timestamp
-        time_label = QLabel(timestamp.strftime("%I:%M %p"))
-        time_label.setStyleSheet("color: #444444; font-size: 10px;")
+        # Timestamp with tick marks (WhatsApp style)
+        time_text = timestamp.strftime("%I:%M %p")
+        if is_user:
+            time_text += " ✓✓"  # Double tick for sent messages
+        time_label = QLabel(time_text)
+        time_label.setStyleSheet("""
+            color: #8696a0;
+            font-size: 11px;
+            margin-top: 2px;
+        """)
         time_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         message_layout.addWidget(time_label)
 
@@ -63,28 +73,34 @@ class MessageBubble(QFrame):
                 self.main_layout.setContentsMargins(10, 5, 10, 5)
 
     def updateBubbleStyle(self, frame):
-        """Update bubble style based on compact mode"""
-        padding = "4px" if self.compact_mode else "8px"
-        frame.setStyleSheet(f"""
-            #userBubble {{
-                background-color: #C0C0C0;
-                border-radius: {8 if self.compact_mode else 10}px;
-                padding: {padding};
-            }}
-            #userBubble QLabel {{
-                color: #000000;
-                font-size: {11 if self.compact_mode else 12}px;
-            }}
-            #aiBubble {{
-                background-color: #E8E8E8;
-                border-radius: {8 if self.compact_mode else 10}px;
-                padding: {padding};
-            }}
-            #aiBubble QLabel {{
-                color: #000000;
-                font-size: {11 if self.compact_mode else 12}px;
-            }}
-        """)
+        """Update bubble style based on compact mode - WhatsApp style"""
+        padding = "8px 12px" if not self.compact_mode else "6px 10px"
+        if self.is_user:
+            frame.setStyleSheet(f"""
+                #userBubble {{
+                    background-color: #d9fdd3;  /* WhatsApp green tint */
+                    border-radius: 12px;
+                    padding: {padding};
+                    margin: 2px;
+                }}
+                #userBubble QLabel {{
+                    color: #111b21;  /* WhatsApp dark text */
+                    font-size: {13 if not self.compact_mode else 12}px;
+                }}
+            """)
+        else:
+            frame.setStyleSheet(f"""
+                #aiBubble {{
+                    background-color: #ffffff;  /* WhatsApp white */
+                    border-radius: 12px;
+                    padding: {padding};
+                    margin: 2px;
+                }}
+                #aiBubble QLabel {{
+                    color: #111b21;  /* WhatsApp dark text */
+                    font-size: {13 if not self.compact_mode else 12}px;
+                }}
+            """)
 
     def setCompactMode(self, compact: bool):
         """Toggle compact mode"""
@@ -114,11 +130,15 @@ class TypingIndicator(QFrame):
         self.main_layout = QHBoxLayout(self)
         self.updateMargins()
 
-        # Create dots
+        # WhatsApp-style typing indicator
         self.dots = []
         for _ in range(3):
             dot = QLabel("•")
-            dot.setStyleSheet(self.getDotStyle())
+            dot.setStyleSheet("""
+                color: #8696a0;
+                font-size: 24px;
+                margin: 0px 2px;
+            """)
             self.main_layout.addWidget(dot)
             self.dots.append(dot)
 
@@ -131,13 +151,15 @@ class TypingIndicator(QFrame):
         self.hide()
 
     def updateStyle(self):
-        """Update indicator style based on compact mode"""
+        """Update indicator style - WhatsApp style"""
+        padding = "6px 10px" if self.compact_mode else "8px 12px"
         self.setStyleSheet(f"""
             #typingIndicator {{
-                background-color: #E0E0E0;
-                border-radius: {8 if self.compact_mode else 10}px;
-                padding: {4 if self.compact_mode else 8}px;
-                margin: {2 if self.compact_mode else 5}px;
+                background-color: #ffffff;
+                border-radius: 12px;
+                padding: {padding};
+                margin: 2px;
+                max-width: 100px;
             }}
         """)
 
@@ -145,16 +167,24 @@ class TypingIndicator(QFrame):
         """Update margins based on compact mode"""
         if self.main_layout:
             self.main_layout.setContentsMargins(
-                5 if self.compact_mode else 10,
-                2 if self.compact_mode else 5,
-                5 if self.compact_mode else 10,
-                2 if self.compact_mode else 5
+                6 if self.compact_mode else 8,
+                3 if self.compact_mode else 4,
+                6 if self.compact_mode else 8,
+                3 if self.compact_mode else 4
             )
 
-    def getDotStyle(self):
-        """Get dot style based on compact mode"""
-        size = "20px" if self.compact_mode else "24px"
-        return f"color: #444444; font-size: {size};"
+    def animate_dots(self):
+        """WhatsApp-style typing animation"""
+        opacities = ["0.3", "0.6", "1.0"]
+        for i, dot in enumerate(self.dots):
+            opacity = opacities[(self.animation_step + i) % 3]
+            dot.setStyleSheet(f"""
+                color: #8696a0;
+                font-size: {20 if self.compact_mode else 24}px;
+                margin: 0px 2px;
+                opacity: {opacity};
+            """)
+        self.animation_step = (self.animation_step + 1) % 3
 
     def setCompactMode(self, compact: bool):
         """Toggle compact mode"""
@@ -162,144 +192,272 @@ class TypingIndicator(QFrame):
             self.compact_mode = compact
             self.updateStyle()
             self.updateMargins()
-            for dot in self.dots:
-                dot.setStyleSheet(self.getDotStyle())
-
-    def animate_dots(self):
-        base_sizes = [24, 20, 16] if not self.compact_mode else [20, 16, 12]
-        styles = [
-            f"color: #444444; font-size: {size}px;"
-            for size in base_sizes
-        ]
-
-        for i, dot in enumerate(self.dots):
-            style_index = (self.animation_step + i) % 3
-            dot.setStyleSheet(styles[style_index])
-
-        self.animation_step = (self.animation_step + 1) % 3
+            # Update dot sizes
+            self.animate_dots()  # This will update the dot styles with new sizes
 
     def start_animation(self):
         self.show()
-        self.timer.start(300)
+        self.timer.start(500)  # Slower animation like WhatsApp
 
     def stop_animation(self):
         self.timer.stop()
         self.hide()
 
 
+class SpeechIndicator(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("speechIndicator")
+        self.compact_mode = False
+        self.updateStyle()
+
+        self.main_layout = QHBoxLayout(self)
+        self.updateMargins()
+
+        # Speech indicator icon and text
+        self.icon_label = QLabel("🎙️")
+        self.text_label = QLabel("Listening...")
+        
+        self.icon_label.setStyleSheet("""
+            font-size: 16px;
+            margin-right: 4px;
+        """)
+        
+        self.text_label.setStyleSheet("""
+            color: #8696a0;
+            font-size: 13px;
+        """)
+
+        self.main_layout.addWidget(self.icon_label)
+        self.main_layout.addWidget(self.text_label)
+        self.main_layout.addStretch()
+        self.hide()
+
+    def updateStyle(self):
+        """Update indicator style"""
+        padding = "6px 10px" if self.compact_mode else "8px 12px"
+        self.setStyleSheet(f"""
+            #speechIndicator {{
+                background-color: #ffffff;
+                border-radius: 12px;
+                padding: {padding};
+                margin: 2px;
+                max-width: 150px;
+            }}
+        """)
+
+    def updateMargins(self):
+        """Update margins based on compact mode"""
+        if self.main_layout:
+            self.main_layout.setContentsMargins(
+                6 if self.compact_mode else 8,
+                3 if self.compact_mode else 4,
+                6 if self.compact_mode else 8,
+                3 if self.compact_mode else 4
+            )
+
+    def setCompactMode(self, compact: bool):
+        """Toggle compact mode"""
+        if self.compact_mode != compact:
+            self.compact_mode = compact
+            self.updateStyle()
+            self.updateMargins()
+
+    def start_listening(self):
+        """Show listening indicator"""
+        self.text_label.setText("Listening...")
+        self.show()
+
+    def start_processing(self):
+        """Show processing indicator"""
+        self.text_label.setText("Processing speech...")
+        self.show()
+
+    def stop(self):
+        """Hide the indicator"""
+        self.hide()
+
+
 class ChatDisplay(QScrollArea):
     COMPACT_WIDTH_THRESHOLD = 600
+    status_changed = pyqtSignal(str)  # Signal for status updates
 
-    def __init__(self, parent=None):
+    def __init__(self, model_config: ModelConfig, parent=None):
         super().__init__(parent)
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.compact_mode = False
         self.chat_name = "New Chat"
+        
+        # Initialize model config and worker
+        self.model_config = model_config
+        self.current_model = None
+        self.worker = None
+        self.current_status = "offline"
 
         # Main widget and layout
         self.content_widget = QWidget()
+        self.content_widget.setStyleSheet("""
+            QWidget {
+                background-color: #efeae2;  /* WhatsApp chat background color */
+            }
+        """)
+        
         self.content_layout = QVBoxLayout(self.content_widget)
-        self.updateLayoutSpacing()
+        self.content_layout.setSpacing(8)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Status label (WhatsApp style)
+        self.status_label = QLabel()
+        self.status_label.setStyleSheet("""
+            QLabel {
+                color: #8696a0;
+                font-size: 13px;
+                margin-bottom: 8px;
+            }
+        """)
+        self.content_layout.addWidget(self.status_label)
+        self.update_status("offline")  # Initial status
+
         self.content_layout.addStretch()
 
         # Typing indicator
         self.typing_indicator = TypingIndicator()
         self.content_layout.addWidget(self.typing_indicator)
 
-        self.setWidget(self.content_widget)
-        self.updateStyle()
+        # Speech indicator
+        self.speech_indicator = SpeechIndicator()
+        self.content_layout.addWidget(self.speech_indicator)
 
-    def updateStyle(self):
-        """Update scroll area style based on compact mode"""
-        scrollbar_width = "8px" if self.compact_mode else "10px"
-        self.setStyleSheet(f"""
-            QScrollArea {{
+        self.setWidget(self.content_widget)
+        self.setStyleSheet("""
+            QScrollArea {
                 border: none;
-                background-color: #E5DDD5;
-            }}
-            QScrollBar:vertical {{
+                background-color: #efeae2;
+            }
+            QScrollBar:vertical {
                 border: none;
-                background: #F0F0F0;
-                width: {scrollbar_width};
-                margin: 0px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: #AAAAAA;
-                min-height: 20px;
-                border-radius: {4 if self.compact_mode else 5}px;
-            }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                background: #00000000;
+                width: 8px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background: #bfbfbf;
+                min-height: 30px;
+                border-radius: 4px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 border: none;
                 background: none;
-            }}
+            }
         """)
 
-    def updateLayoutSpacing(self):
-        """Update layout spacing based on compact mode"""
-        if self.content_layout:
-            self.content_layout.setSpacing(5 if self.compact_mode else 10)
-            self.content_layout.setContentsMargins(
-                5 if self.compact_mode else 10,
-                5 if self.compact_mode else 10,
-                5 if self.compact_mode else 10,
-                5 if self.compact_mode else 10
-            )
-
-    def resizeEvent(self, event: QResizeEvent):
-        """Handle resize events to toggle compact mode"""
-        super().resizeEvent(event)
-        new_compact_mode = event.size().width() < self.COMPACT_WIDTH_THRESHOLD
-
-        if new_compact_mode != self.compact_mode:
-            self.compact_mode = new_compact_mode
-            self.updateStyle()
-            self.updateLayoutSpacing()
-
-            # Update all message bubbles
-            for i in range(self.content_layout.count()):
-                item = self.content_layout.itemAt(i)
-                if item and item.widget():
-                    widget = item.widget()
-                    if isinstance(widget, (MessageBubble, TypingIndicator)):
-                        widget.setCompactMode(self.compact_mode)
-
     def add_message(self, text: str, is_user: bool = False):
-        """Add a message to the chat display"""
-        # Get the scroll bar
-        scrollbar = self.verticalScrollBar()
-        if not scrollbar:
-            return
-
-        # Remove the stretch if it exists
+        """Add a message to the chat"""
+        # Remove stretch if it exists
         for i in range(self.content_layout.count()):
             item = self.content_layout.itemAt(i)
             if item and item.spacerItem():
                 self.content_layout.removeItem(item)
                 break
 
-        # Create and add the message bubble
-        bubble = MessageBubble(text, datetime.now(), is_user)
-        bubble.setCompactMode(self.compact_mode)  # Set initial compact mode
-        self.content_layout.addWidget(bubble)
+        # Add new message
+        message = MessageBubble(text, datetime.now(), is_user)
+        message.setCompactMode(self.compact_mode)
+        self.content_layout.addWidget(message)
 
         # Add stretch back
         self.content_layout.addStretch()
 
-        # Ensure scrollbar exists before trying to scroll
+        # Scroll to bottom
+        QTimer.singleShot(100, self.scroll_to_bottom)
+
+    def scroll_to_bottom(self):
+        """Scroll to the bottom of the chat"""
+        scrollbar = self.verticalScrollBar()
         if scrollbar:
             scrollbar.setValue(scrollbar.maximum())
 
+    def update_status(self, status: str):
+        """Update the AI's status display"""
+        self.current_status = status
+        status_text = ""
+        status_color = "#8696a0"  # Default gray
+
+        if status == "online":
+            status_text = "online"
+            status_color = "#00a884"  # WhatsApp green
+        elif status == "offline":
+            status_text = "offline"
+        elif status == "typing":
+            status_text = "typing..."
+            status_color = "#00a884"  # WhatsApp green
+        elif status == "listening":
+            status_text = "listening..."
+            status_color = "#00a884"  # WhatsApp green
+        elif status == "processing":
+            status_text = "processing speech..."
+            status_color = "#00a884"  # WhatsApp green
+
+        self.status_label.setStyleSheet(f"""
+            QLabel {{
+                color: {status_color};
+                font-size: 13px;
+                margin-bottom: 8px;
+            }}
+        """)
+        self.status_label.setText(status_text)
+        self.status_changed.emit(status)
+
+    def show_speech_indicator(self, state="listening"):
+        """Show the speech indicator"""
+        if state == "listening":
+            self.speech_indicator.start_listening()
+            self.update_status("listening")
+        elif state == "processing":
+            self.speech_indicator.start_processing()
+            self.update_status("processing")
+        self.scroll_to_bottom()
+
+    def hide_speech_indicator(self):
+        """Hide the speech indicator"""
+        self.speech_indicator.stop()
+        if self.current_status in ["listening", "processing"]:
+            self.update_status("online")
+
+    def set_current_model(self, model_name: str):
+        """Set the current AI model"""
+        self.current_model = model_name
+        model_info = self.model_config.get_model_info(model_name)
+        if model_info:
+            self.update_status("online")
+            self.add_message(
+                f"👋 Welcome! I'm {model_name}, your AI assistant.\n{model_info['description']}", 
+                is_user=False
+            )
+
     def send_message(self, text: str):
         """Send a message and handle the response in a thread-safe way"""
+        if not text.strip() or not self.current_model:
+            return
+
         try:
             # Add user message to chat
             self.add_message(text, is_user=True)
             
-            # Show typing indicator
+            # Show typing indicator and update status
             self.show_typing_indicator()
+            self.update_status("typing")
             
-            # Create and configure worker thread
+            # Attempt to use CLI first
+            cli_response = self.ollama_client.run_cli(self.current_model, text)
+            if cli_response:
+                self.add_message(cli_response, is_user=False)
+                self.hide_typing_indicator()
+                self.update_status("online")
+                return
+            
+            # If CLI fails, use the worker for API interaction
             self.worker = Worker(text, self.current_model, self.model_config)
             
             # Connect signals
@@ -312,32 +470,35 @@ class ChatDisplay(QScrollArea):
             
         except Exception as e:
             self.hide_typing_indicator()
+            self.update_status("online")
             self.add_message(f"Error sending message: {str(e)}", is_user=False)
-            
+
     def handle_response(self, response: str):
         """Handle the response from the worker thread"""
         self.hide_typing_indicator()
+        self.update_status("online")
         self.add_message(response, is_user=False)
         
     def handle_error(self, error_message: str):
         """Handle any errors from the worker thread"""
         self.hide_typing_indicator()
-        self.add_message(error_message, is_user=False)
+        self.update_status("offline")
+        self.add_message(f"Error: {error_message}", is_user=False)
         
     def cleanup_worker(self):
         """Clean up the worker thread"""
-        if hasattr(self, 'worker'):
+        if self.worker:
             self.worker.stop()
             self.worker.deleteLater()
-            del self.worker
+            self.worker = None
+            if self.current_status == "typing":
+                self.update_status("online")
 
     def show_typing_indicator(self):
         """Show the typing indicator"""
-        self.typing_indicator.setCompactMode(self.compact_mode)  # Ensure correct mode
+        self.typing_indicator.setCompactMode(self.compact_mode)
         self.typing_indicator.start_animation()
-        scrollbar = self.verticalScrollBar()
-        if scrollbar:
-            scrollbar.setValue(scrollbar.maximum())
+        self.scroll_to_bottom()
 
     def hide_typing_indicator(self):
         """Hide the typing indicator"""
@@ -345,12 +506,11 @@ class ChatDisplay(QScrollArea):
 
     def clear_messages(self):
         """Clear all messages from the chat"""
-        # Remove all widgets except the typing indicator and stretch
         while self.content_layout.count() > 0:
             item = self.content_layout.takeAt(0)
             if item:
                 widget = item.widget()
-                if widget and not isinstance(widget, TypingIndicator):
+                if widget and not isinstance(widget, (TypingIndicator, SpeechIndicator, QLabel)):
                     widget.deleteLater()
                 elif item.spacerItem():
                     self.content_layout.removeItem(item)
@@ -394,3 +554,10 @@ class ChatDisplay(QScrollArea):
                 timestamp = datetime.fromisoformat(msg["timestamp"]).strftime("%Y-%m-%d %I:%M %p")
                 lines.append(f"[{timestamp}] {sender}: {msg['text']}\n")
             return "".join(lines)
+
+    def closeEvent(self, event):
+        """Handle closure of the chat display"""
+        self.update_status("offline")
+        if self.worker and self.worker.isRunning():
+            self.worker.stop()
+        super().closeEvent(event)

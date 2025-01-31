@@ -7,7 +7,6 @@ import numpy as np
 import logging
 import unicodedata
 import string
-import weakref
 
 # Get logger for speech module
 logger = logging.getLogger("main.speech")
@@ -30,7 +29,7 @@ CHAR_REPLACEMENTS = {
     '\u028c': 'v',  # Turned V
     '\u0275': 'o',  # Barred O
     '\u0264': 'g',  # Small Capital G
-
+    
     # Consonants
     '\u0283': 'sh',  # Esh
     '\u027e': 'r',   # R with Fishhook
@@ -43,7 +42,7 @@ CHAR_REPLACEMENTS = {
     '\u0256': 'd',   # Turned D
     '\u0273': 'n',   # N with retroflex hook
     '\u0272': 'n',   # N with left hook
-
+    
     # Additional common characters
     '\u2019': "'",   # Right single quotation mark
     '\u2018': "'",   # Left single quotation mark
@@ -87,7 +86,7 @@ except ImportError:
 class SpeechHandler:
     def __init__(self, parent=None):
         logger.debug("Initializing SpeechHandler")
-        self.parent = weakref.proxy(parent) if parent else None  # Use weakref to prevent circular reference
+        self.parent = parent
         self.is_speaking = False
         self.speech_queue = []
         self.engine = None
@@ -132,7 +131,7 @@ class SpeechHandler:
         try:
             # Store original text for logging
             original_text = text
-
+            
             # Step 1: Replace known problematic characters
             for char, replacement in CHAR_REPLACEMENTS.items():
                 if char in text:
@@ -141,10 +140,10 @@ class SpeechHandler:
 
             # Step 2: Normalize Unicode characters
             text = unicodedata.normalize('NFKD', text)
-
+            
             # Step 3: Build sanitized text using only valid characters
             sanitized = ''.join(c for c in text if c in VALID_CHARS)
-
+            
             # Log changes if any were made
             if sanitized != original_text:
                 # Find and log all characters that were removed
@@ -152,13 +151,13 @@ class SpeechHandler:
                 for i, char in enumerate(original_text):
                     if char not in VALID_CHARS and char not in CHAR_REPLACEMENTS:
                         removed_chars.add(repr(char))
-
+                
                 if removed_chars:
                     logger.debug(f"Removed unsupported characters: {', '.join(removed_chars)}")
                 logger.debug(f"Text sanitized from: {repr(original_text[:50])}... to: {repr(sanitized[:50])}...")
-
+            
             return sanitized
-
+            
         except Exception as e:
             logger.error(f"Error during text sanitization: {str(e)}")
             # Return original text if sanitization fails
@@ -173,20 +172,17 @@ class SpeechHandler:
         self.is_speaking = True
         logger.info(f"Starting TTS using method: {method}")
 
+        # Update UI indicator if parent exists
+        if self.parent and hasattr(self.parent, 'speaking_indicator'):
+            self.parent.speaking_indicator.setText("Speaking...")
+            self.parent.stop_button.setEnabled(True)
+
+        # Clean and sanitize the text
+        text = re.sub(r"<.*?>", "", text).strip()
+        original_text = text
+        text = self._sanitize_text(text)
+
         try:
-            # Update UI indicator if parent exists
-            if self.parent:
-                try:
-                    self.parent.speaking_indicator.setText("Speaking...")
-                    self.parent.stop_button.setEnabled(True)
-                except (ReferenceError, RuntimeError):
-                    pass  # Parent widget has been deleted
-
-            # Clean and sanitize the text
-            text = re.sub(r"<.*?>", "", text).strip()
-            original_text = text
-            text = self._sanitize_text(text)
-
             if method == "pyttsx3 (System)" and PYTTSX3_AVAILABLE:
                 logger.debug("Using pyttsx3 for TTS")
                 self.engine = pyttsx3.init()
@@ -205,16 +201,15 @@ class SpeechHandler:
             if self.speech_queue and callback:
                 next_text = self.speech_queue.pop(0)
                 logger.debug("Processing next item in speech queue")
-                QTimer.singleShot(500, lambda: self.text_to_speech(next_text, method, callback))
+                QTimer.singleShot(
+                    500, lambda: self.text_to_speech(next_text, method, callback)
+                )
             else:
                 self.is_speaking = False
                 # Update UI indicator
-                if self.parent:
-                    try:
-                        self.parent.speaking_indicator.setText("TTS Ready")
-                        self.parent.stop_button.setEnabled(False)
-                    except (ReferenceError, RuntimeError):
-                        pass
+                if self.parent and hasattr(self.parent, 'speaking_indicator'):
+                    self.parent.speaking_indicator.setText("TTS Ready")
+                    self.parent.stop_button.setEnabled(False)
                 if callback:
                     callback()
                 logger.info("TTS completed successfully")
@@ -224,13 +219,10 @@ class SpeechHandler:
         except Exception as e:
             self.is_speaking = False
             # Update UI indicator on error
-            if self.parent:
-                try:
-                    self.parent.speaking_indicator.setText("TTS Error")
-                    self.parent.stop_button.setEnabled(False)
-                except (ReferenceError, RuntimeError):
-                    pass
-
+            if self.parent and hasattr(self.parent, 'speaking_indicator'):
+                self.parent.speaking_indicator.setText("TTS Error")
+                self.parent.stop_button.setEnabled(False)
+            
             # Enhanced error logging for character encoding issues
             if "charmap" in str(e):
                 logger.error(f"Character encoding error in TTS.")
@@ -239,7 +231,7 @@ class SpeechHandler:
                 logger.error(f"Error details: {str(e)}")
             else:
                 logger.error(f"TTS error: {str(e)}")
-
+            
             if callback:
                 callback(error=str(e))
             return False
@@ -252,12 +244,12 @@ class SpeechHandler:
             if self.tts_model is None:
                 logger.error("TTS model not initialized")
                 raise Exception("TTS model not initialized")
-
+                
             self.tts_model.tts_to_file(text, file_path=file_path)
             logger.debug("Audio file generated, playing...")
-            subprocess.run(["ffplay", "-nodisp", "-autoexit", file_path],
-                         check=True,
-                         stderr=subprocess.DEVNULL,
+            subprocess.run(["ffplay", "-nodisp", "-autoexit", file_path], 
+                         check=True, 
+                         stderr=subprocess.DEVNULL, 
                          stdout=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
             logger.error("Failed to play audio file")
@@ -274,53 +266,41 @@ class SpeechHandler:
                     logger.warning(f"Failed to remove temporary file: {file_path}")
                     pass
 
+    def __del__(self):
+        """Cleanup resources"""
+        logger.debug("Cleaning up SpeechHandler resources")
+        self.stop_speaking()
+        if os.path.exists(self.output_dir):
+            try:
+                for file in os.listdir(self.output_dir):
+                    os.remove(os.path.join(self.output_dir, file))
+                os.rmdir(self.output_dir)
+                logger.debug(f"Removed temporary directory: {self.output_dir}")
+            except:
+                logger.warning(f"Failed to clean up temporary directory: {self.output_dir}")
+                pass
+
     def stop_speaking(self):
         """Stop current TTS output"""
         logger.info("Stopping TTS output")
         self.is_speaking = False
         self.speech_queue.clear()
-
-        # Update UI indicator if parent exists
-        if self.parent:
+        # Update UI indicator
+        if self.parent and hasattr(self.parent, 'speaking_indicator') and self.parent.speaking_indicator is not None:
             try:
                 self.parent.speaking_indicator.setText("TTS Stopped")
                 self.parent.stop_button.setEnabled(False)
-            except (ReferenceError, RuntimeError):
-                pass  # Parent widget has been deleted
-
-        if hasattr(self, "engine") and self.engine:
-            try:
-                self.engine.stop()
-                logger.debug("TTS engine stopped")
-            except:
-                logger.warning("Failed to stop TTS engine")
-                pass
-
-    def __del__(self):
-        """Cleanup resources"""
-        logger.debug("Cleaning up SpeechHandler resources")
-        try:
-            self.stop_speaking()
-            if os.path.exists(self.output_dir):
-                for file in os.listdir(self.output_dir):
-                    try:
-                        os.remove(os.path.join(self.output_dir, file))
-                    except:
-                        pass
-                try:
-                    os.rmdir(self.output_dir)
-                    logger.debug(f"Removed temporary directory: {self.output_dir}")
-                except:
-                    logger.warning(f"Failed to remove temporary directory: {self.output_dir}")
-        except:
-            pass
+            except RuntimeError:
+                logger.warning("Attempted to access deleted UI component")
 
     def start_listening(self, duration=5, callback=None):
         """Records audio and converts it to text using the Whisper model"""
         if not STT_AVAILABLE:
             logger.error("Speech-to-Text is not available")
             if callback:
-                callback(error="Speech-to-Text is not available. Please install whisper and sounddevice.")
+                callback(
+                    error="Speech-to-Text is not available. Please install whisper and sounddevice."
+                )
             return False
 
         try:

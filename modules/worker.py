@@ -1,6 +1,12 @@
 from PyQt6.QtCore import QThread, pyqtSignal
 from typing import Optional, Dict
+import sys
+import traceback
+import logging
 from .model_config import ModelConfig
+from .ollama_client import OllamaClient
+
+logger = logging.getLogger("main.worker")
 
 class Worker(QThread):
     """Worker thread for handling model queries"""
@@ -14,6 +20,7 @@ class Worker(QThread):
         self.model_name = model_name
         self.model_config = model_config
         self._is_running = True
+        self.ollama_client = OllamaClient()
         
     def stop(self):
         """Safely stop the worker thread"""
@@ -42,21 +49,40 @@ class Worker(QThread):
                 return
 
             try:
-                # TODO: Implement actual model inference here
-                # For now, return a placeholder response
-                response = f"Response from {self.model_name} (placeholder)"
+                # Check if model exists in Ollama
+                if not self.ollama_client.check_model_exists(self.model_name):
+                    self.error_occurred.emit(
+                        f"Model {self.model_name} not found in Ollama. "
+                        "Please run 'ollama pull {self.model_name}' to download it."
+                    )
+                    return
+
+                # Generate response using Ollama
+                logger.debug(f"Generating response for query: {self.query}")
+                response = self.ollama_client.generate(
+                    model=self.model_name,
+                    prompt=self.query,
+                    params=params
+                )
                 
-                if self._is_running:
+                if self._is_running and response:
                     self.result_ready.emit(response)
+                else:
+                    self.error_occurred.emit("No response generated")
+
             except ConnectionError as ce:
-                self.error_occurred.emit(f"Connection Error: Could not connect to the AI model. Please check your internet connection.")
+                self.error_occurred.emit(
+                    "Could not connect to Ollama service. "
+                    "Please make sure Ollama is running by executing 'ollama serve'"
+                )
             except TimeoutError as te:
-                self.error_occurred.emit(f"Timeout Error: The request to the AI model took too long.")
+                self.error_occurred.emit("Request to Ollama service timed out")
             except Exception as model_error:
                 self.error_occurred.emit(f"Model Error: {str(model_error)}")
                 
         except Exception as e:
             error_info = ''.join(traceback.format_exception(*sys.exc_info()))
+            logger.error(f"Worker thread error: {error_info}")
             self.error_occurred.emit(f"System Error: {str(e)}\n{error_info}")
         finally:
             self.finished.emit()

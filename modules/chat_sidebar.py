@@ -6,10 +6,12 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QFrame,
-    QStackedWidget
+    QStackedWidget,
+    QToolButton,
+    QLineEdit
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtGui import QIcon, QFont, QColor, QPalette
 
 class ContactItem(QFrame):
     clicked = pyqtSignal(str)  # Signal to emit model name when clicked
@@ -24,53 +26,115 @@ class ContactItem(QFrame):
         self.setStyleSheet("""
             #contactItem {
                 background-color: white;
-                border-bottom: 1px solid #E0E0E0;
-                padding: 10px;
+                border: none;
+                padding: 8px 12px;
             }
             #contactItem:hover {
-                background-color: #F5F5F5;
+                background-color: #f0f2f5;
             }
         """)
         
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
         
-        # Avatar/Icon
+        # Avatar container with WhatsApp style
+        avatar_container = QFrame()
+        avatar_container.setFixedSize(49, 49)
+        avatar_container.setStyleSheet("""
+            QFrame {
+                background-color: #00a884;
+                border-radius: 24px;
+                margin: 0;
+            }
+        """)
+        
+        avatar_layout = QHBoxLayout(avatar_container)
+        avatar_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Avatar/Icon with emoji
         avatar = QLabel("🤖")
         avatar.setStyleSheet("""
             QLabel {
-                background-color: #128C7E;
                 color: white;
-                border-radius: 20px;
-                padding: 8px;
-                font-size: 18px;
+                font-size: 22px;
             }
         """)
-        avatar.setFixedSize(40, 40)
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(avatar)
+        avatar_layout.addWidget(avatar)
         
-        # Model info
-        info_layout = QVBoxLayout()
+        layout.addWidget(avatar_container)
         
+        # Contact info container
+        info_container = QFrame()
+        info_container.setStyleSheet("""
+            QFrame {
+                border-bottom: 1px solid #e9edef;
+                padding-bottom: 8px;
+            }
+        """)
+        
+        info_layout = QVBoxLayout(info_container)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(4)
+        
+        # Model name with WhatsApp style
         name_label = QLabel(model_name)
-        name_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        name_label.setStyleSheet("""
+            QLabel {
+                color: #111b21;
+                font-size: 17px;
+                font-weight: normal;
+            }
+        """)
         
+        # Description with WhatsApp style
         desc_label = QLabel(description)
-        desc_label.setStyleSheet("color: #666666; font-size: 12px;")
+        desc_label.setStyleSheet("""
+            QLabel {
+                color: #667781;
+                font-size: 14px;
+            }
+        """)
         desc_label.setWordWrap(True)
         
         info_layout.addWidget(name_label)
         info_layout.addWidget(desc_label)
-        layout.addLayout(info_layout, stretch=1)
+        layout.addWidget(info_container, stretch=1)
 
     def mousePressEvent(self, event):
         try:
             if event.button() == Qt.MouseButton.LeftButton:
                 self.clicked.emit(self.model_name)
+                # Add visual feedback
+                self.setStyleSheet("""
+                    #contactItem {
+                        background-color: #e9edef;
+                        border: none;
+                        padding: 8px 12px;
+                    }
+                """)
             super().mousePressEvent(event)
         except Exception as e:
             print(f"Error in mousePressEvent: {str(e)}")
+
+    def mouseReleaseEvent(self, event):
+        try:
+            if event.button() == Qt.MouseButton.LeftButton:
+                # Restore normal style
+                self.setStyleSheet("""
+                    #contactItem {
+                        background-color: white;
+                        border: none;
+                        padding: 8px 12px;
+                    }
+                    #contactItem:hover {
+                        background-color: #f0f2f5;
+                    }
+                """)
+            super().mouseReleaseEvent(event)
+        except Exception as e:
+            print(f"Error in mouseReleaseEvent: {str(e)}")
 
 
 class ChatSidebar(QWidget):
@@ -86,23 +150,127 @@ class ChatSidebar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Header
+        # Header with WhatsApp style
         header = QFrame()
         header.setStyleSheet("""
             QFrame {
-                background-color: #128C7E;
-                color: white;
+                background-color: #f0f2f5;
+                border-right: 1px solid #d1d7db;
+                border-bottom: 1px solid #d1d7db;
             }
         """)
         header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(16, 10, 16, 10)
         
-        title = QLabel("AI Chat Models")
-        title.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
-        header_layout.addWidget(title)
+        # Profile section
+        profile_layout = QHBoxLayout()
+        profile_layout.setSpacing(12)
         
+        # Profile avatar
+        profile_avatar = QLabel("🤖")
+        profile_avatar.setStyleSheet("""
+            QLabel {
+                background-color: #00a884;
+                color: white;
+                font-size: 22px;
+                border-radius: 20px;
+                min-width: 40px;
+                min-height: 40px;
+            }
+        """)
+        profile_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        profile_layout.addWidget(profile_avatar)
+        
+        header_layout.addLayout(profile_layout)
+        
+        # Header buttons
+        header_buttons = QHBoxLayout()
+        header_buttons.setSpacing(8)
+        
+        # Status button
+        status_btn = QToolButton()
+        status_btn.setIcon(QIcon("assets/status.png"))  # Add your icon
+        status_btn.setIconSize(QSize(24, 24))
+        status_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 20px;
+            }
+            QToolButton:hover {
+                background-color: #e9edef;
+            }
+        """)
+        header_buttons.addWidget(status_btn)
+        
+        # New chat button
+        new_chat_btn = QToolButton()
+        new_chat_btn.setIcon(QIcon("assets/new-chat.png"))  # Add your icon
+        new_chat_btn.setIconSize(QSize(24, 24))
+        new_chat_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 20px;
+            }
+            QToolButton:hover {
+                background-color: #e9edef;
+            }
+        """)
+        header_buttons.addWidget(new_chat_btn)
+        
+        # Menu button
+        menu_btn = QToolButton()
+        menu_btn.setIcon(QIcon("assets/menu.png"))  # Add your icon
+        menu_btn.setIconSize(QSize(24, 24))
+        menu_btn.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 20px;
+            }
+            QToolButton:hover {
+                background-color: #e9edef;
+            }
+        """)
+        header_buttons.addWidget(menu_btn)
+        
+        header_layout.addLayout(header_buttons)
         layout.addWidget(header)
         
-        # Scroll area for contacts
+        # Search bar with WhatsApp style
+        search_container = QFrame()
+        search_container.setStyleSheet("""
+            QFrame {
+                background-color: #f0f2f5;
+                border-right: 1px solid #d1d7db;
+            }
+        """)
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(8, 8, 8, 8)
+        
+        search_box = QLineEdit()
+        search_box.setPlaceholderText("Search or start new chat")
+        search_box.setStyleSheet("""
+            QLineEdit {
+                background-color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 9px 12px 9px 32px;
+                font-size: 15px;
+                color: #111b21;
+            }
+            QLineEdit:focus {
+                outline: none;
+            }
+            QLineEdit::placeholder {
+                color: #8696a0;
+            }
+        """)
+        search_layout.addWidget(search_box)
+        layout.addWidget(search_container)
+        
+        # Scroll area for contacts with WhatsApp style
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -110,6 +278,22 @@ class ChatSidebar(QWidget):
             QScrollArea {
                 border: none;
                 background-color: white;
+                border-right: 1px solid #d1d7db;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #ffffff;
+                width: 6px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #cccccc;
+                min-height: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
             }
         """)
         

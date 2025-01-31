@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QFrame, QMenu, QToolButton,
     QMessageBox, QDialog, QTabWidget, QSpinBox, QCheckBox,
     QColorDialog, QFileDialog, QInputDialog, QGroupBox,
-    QSlider
+    QSlider, QTableWidget, QTableWidgetItem, QHeaderView,
+    QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction, QColor
@@ -20,8 +21,9 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(500)
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
+        self.model_config = ModelConfig()
 
         layout = QVBoxLayout(self)
 
@@ -32,8 +34,34 @@ class SettingsDialog(QDialog):
         model_tab = QWidget()
         model_layout = QVBoxLayout(model_tab)
 
+        # Sync Models Button
+        sync_layout = QHBoxLayout()
+        sync_button = QPushButton("🔄 Sync Models from Ollama")
+        sync_button.clicked.connect(self.sync_models)
+        sync_layout.addWidget(sync_button)
+        sync_layout.addStretch()
+        model_layout.addLayout(sync_layout)
+
+        # Models Table
+        self.models_table = QTableWidget()
+        self.models_table.setColumnCount(5)
+        self.models_table.setHorizontalHeaderLabels([
+            "Model Name", 
+            "Family",
+            "Parameters",
+            "Quantization",
+            "Size"
+        ])
+        header = self.models_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        model_layout.addWidget(self.models_table)
+
         # Model Configuration Group
-        model_group = QGroupBox("Model Configuration")
+        model_group = QGroupBox("Model Parameters")
         model_group_layout = QVBoxLayout()
 
         # Temperature
@@ -47,27 +75,39 @@ class SettingsDialog(QDialog):
         temp_layout.addWidget(self.temp_spin)
         model_group_layout.addLayout(temp_layout)
 
-        # Max tokens
-        tokens_layout = QHBoxLayout()
-        tokens_label = QLabel("Max Tokens:")
-        tokens_label.setToolTip("Maximum length of generated responses")
-        self.tokens_spin = QSpinBox()
-        self.tokens_spin.setRange(100, 4000)
-        self.tokens_spin.setValue(2000)
-        tokens_layout.addWidget(tokens_label)
-        tokens_layout.addWidget(self.tokens_spin)
-        model_group_layout.addLayout(tokens_layout)
+        # Top P
+        top_p_layout = QHBoxLayout()
+        top_p_label = QLabel("Top P:")
+        top_p_label.setToolTip("Nucleus sampling threshold")
+        self.top_p_spin = QSpinBox()
+        self.top_p_spin.setRange(1, 100)
+        self.top_p_spin.setValue(95)
+        top_p_layout.addWidget(top_p_label)
+        top_p_layout.addWidget(self.top_p_spin)
+        model_group_layout.addLayout(top_p_layout)
 
-        # Context window
-        context_layout = QHBoxLayout()
-        context_label = QLabel("Context Window:")
-        context_label.setToolTip("Number of previous messages to consider")
-        self.context_spin = QSpinBox()
-        self.context_spin.setRange(1, 20)
-        self.context_spin.setValue(5)
-        context_layout.addWidget(context_label)
-        context_layout.addWidget(self.context_spin)
-        model_group_layout.addLayout(context_layout)
+        # Top K
+        top_k_layout = QHBoxLayout()
+        top_k_label = QLabel("Top K:")
+        top_k_label.setToolTip("Number of tokens to consider for sampling")
+        self.top_k_spin = QSpinBox()
+        self.top_k_spin.setRange(1, 100)
+        self.top_k_spin.setValue(40)
+        top_k_layout.addWidget(top_k_label)
+        top_k_layout.addWidget(self.top_k_spin)
+        model_group_layout.addLayout(top_k_layout)
+
+        # Repeat Penalty
+        repeat_layout = QHBoxLayout()
+        repeat_label = QLabel("Repeat Penalty:")
+        repeat_label.setToolTip("Penalty for repeating tokens")
+        self.repeat_spin = QDoubleSpinBox()
+        self.repeat_spin.setRange(1.0, 2.0)
+        self.repeat_spin.setSingleStep(0.1)
+        self.repeat_spin.setValue(1.1)
+        repeat_layout.addWidget(repeat_label)
+        repeat_layout.addWidget(self.repeat_spin)
+        model_group_layout.addLayout(repeat_layout)
 
         model_group.setLayout(model_group_layout)
         model_layout.addWidget(model_group)
@@ -90,230 +130,143 @@ class SettingsDialog(QDialog):
         model_layout.addWidget(response_group)
 
         model_layout.addStretch()
-        tabs.addTab(model_tab, "Model")
+        tabs.addTab(model_tab, "Models")
 
         # Theme Settings Tab
         theme_tab = QWidget()
         theme_layout = QVBoxLayout(theme_tab)
 
-        # Appearance Group
-        appearance_group = QGroupBox("Appearance")
-        appearance_layout = QVBoxLayout()
-
-        # Theme Mode
-        theme_mode_layout = QHBoxLayout()
-        theme_mode_label = QLabel("Theme Mode:")
-        self.theme_mode_combo = QComboBox()
-        self.theme_mode_combo.addItems(["Light", "Dark", "System"])
-        theme_mode_layout.addWidget(theme_mode_label)
-        theme_mode_layout.addWidget(self.theme_mode_combo)
-        appearance_layout.addLayout(theme_mode_layout)
-
-        # Color Scheme
-        colors_group = QGroupBox("Color Scheme")
-        colors_layout = QVBoxLayout()
+        # Color Theme Group
+        color_group = QGroupBox("Color Theme")
+        color_layout = QVBoxLayout()
 
         # Primary Color
         primary_layout = QHBoxLayout()
         primary_label = QLabel("Primary Color:")
         self.primary_color_btn = QPushButton()
-        self.primary_color_btn.setFixedSize(30, 30)
         self.primary_color_btn.clicked.connect(lambda: self.choose_color("primary"))
-        self.set_button_color(self.primary_color_btn, "#128C7E")
+        self.set_button_color(self.primary_color_btn, "#128C7E")  # WhatsApp green
         primary_layout.addWidget(primary_label)
         primary_layout.addWidget(self.primary_color_btn)
-        colors_layout.addLayout(primary_layout)
+        color_layout.addLayout(primary_layout)
 
         # Secondary Color
         secondary_layout = QHBoxLayout()
         secondary_label = QLabel("Secondary Color:")
         self.secondary_color_btn = QPushButton()
-        self.secondary_color_btn.setFixedSize(30, 30)
         self.secondary_color_btn.clicked.connect(lambda: self.choose_color("secondary"))
-        self.set_button_color(self.secondary_color_btn, "#075E54")
+        self.set_button_color(self.secondary_color_btn, "#075E54")  # WhatsApp dark green
         secondary_layout.addWidget(secondary_label)
         secondary_layout.addWidget(self.secondary_color_btn)
-        colors_layout.addLayout(secondary_layout)
+        color_layout.addLayout(secondary_layout)
 
-        # Accent Color
-        accent_layout = QHBoxLayout()
-        accent_label = QLabel("Accent Color:")
-        self.accent_color_btn = QPushButton()
-        self.accent_color_btn.setFixedSize(30, 30)
-        self.accent_color_btn.clicked.connect(lambda: self.choose_color("accent"))
-        self.set_button_color(self.accent_color_btn, "#25D366")
-        accent_layout.addWidget(accent_label)
-        accent_layout.addWidget(self.accent_color_btn)
-        colors_layout.addLayout(accent_layout)
+        # Background Color
+        bg_layout = QHBoxLayout()
+        bg_label = QLabel("Background Color:")
+        self.bg_color_btn = QPushButton()
+        self.bg_color_btn.clicked.connect(lambda: self.choose_color("bg"))
+        self.set_button_color(self.bg_color_btn, "#FFFFFF")
+        bg_layout.addWidget(bg_label)
+        bg_layout.addWidget(self.bg_color_btn)
+        color_layout.addLayout(bg_layout)
 
-        colors_group.setLayout(colors_layout)
-        appearance_layout.addWidget(colors_group)
+        # Text Color
+        text_layout = QHBoxLayout()
+        text_label = QLabel("Text Color:")
+        self.text_color_btn = QPushButton()
+        self.text_color_btn.clicked.connect(lambda: self.choose_color("text"))
+        self.set_button_color(self.text_color_btn, "#000000")
+        text_layout.addWidget(text_label)
+        text_layout.addWidget(self.text_color_btn)
+        color_layout.addLayout(text_layout)
 
-        # Font Settings
-        font_group = QGroupBox("Font Settings")
-        font_layout = QVBoxLayout()
+        color_group.setLayout(color_layout)
+        theme_layout.addWidget(color_group)
 
-        # Font Size
-        font_size_layout = QHBoxLayout()
-        font_size_label = QLabel("Font Size:")
-        self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(8, 24)
-        self.font_size_spin.setValue(12)
-        font_size_layout.addWidget(font_size_label)
-        font_size_layout.addWidget(self.font_size_spin)
-        font_layout.addLayout(font_size_layout)
+        # Theme Options Group
+        theme_options_group = QGroupBox("Theme Options")
+        theme_options_layout = QVBoxLayout()
 
-        # Font Family
-        font_family_layout = QHBoxLayout()
-        font_family_label = QLabel("Font Family:")
-        self.font_family_combo = QComboBox()
-        self.font_family_combo.addItems(["System Default", "Arial", "Helvetica", "Times New Roman"])
-        font_family_layout.addWidget(font_family_label)
-        font_family_layout.addWidget(self.font_family_combo)
-        font_layout.addLayout(font_family_layout)
+        self.dark_mode = QCheckBox("Dark Mode")
+        self.dark_mode.setToolTip("Enable dark mode theme")
+        theme_options_layout.addWidget(self.dark_mode)
 
-        font_group.setLayout(font_layout)
-        appearance_layout.addWidget(font_group)
+        self.custom_css = QCheckBox("Use Custom CSS")
+        self.custom_css.setToolTip("Enable custom CSS styling")
+        theme_options_layout.addWidget(self.custom_css)
 
-        appearance_group.setLayout(appearance_layout)
-        theme_layout.addWidget(appearance_group)
-
-        # Chat Appearance
-        chat_appearance_group = QGroupBox("Chat Appearance")
-        chat_layout = QVBoxLayout()
-
-        self.show_timestamps = QCheckBox("Show Message Timestamps")
-        self.show_timestamps.setChecked(True)
-        chat_layout.addWidget(self.show_timestamps)
-
-        self.compact_messages = QCheckBox("Compact Message Display")
-        chat_layout.addWidget(self.compact_messages)
-
-        self.show_avatars = QCheckBox("Show User Avatars")
-        self.show_avatars.setChecked(True)
-        chat_layout.addWidget(self.show_avatars)
-
-        chat_appearance_group.setLayout(chat_layout)
-        theme_layout.addWidget(chat_appearance_group)
+        theme_options_group.setLayout(theme_options_layout)
+        theme_layout.addWidget(theme_options_group)
 
         theme_layout.addStretch()
         tabs.addTab(theme_tab, "Theme")
-
-        # Behavior Settings Tab
-        behavior_tab = QWidget()
-        behavior_layout = QVBoxLayout(behavior_tab)
-
-        # Input Settings
-        input_group = QGroupBox("Input Settings")
-        input_layout = QVBoxLayout()
-
-        self.send_on_enter = QCheckBox("Send Message on Enter")
-        self.send_on_enter.setChecked(True)
-        input_layout.addWidget(self.send_on_enter)
-
-        self.spell_check = QCheckBox("Enable Spell Check")
-        self.spell_check.setChecked(True)
-        input_layout.addWidget(self.spell_check)
-
-        self.auto_complete = QCheckBox("Enable Auto-Complete")
-        self.auto_complete.setChecked(True)
-        input_layout.addWidget(self.auto_complete)
-
-        input_group.setLayout(input_layout)
-        behavior_layout.addWidget(input_group)
-
-        # Notification Settings
-        notification_group = QGroupBox("Notifications")
-        notification_layout = QVBoxLayout()
-
-        self.desktop_notifications = QCheckBox("Enable Desktop Notifications")
-        notification_layout.addWidget(self.desktop_notifications)
-
-        self.sound_notifications = QCheckBox("Enable Sound Notifications")
-        notification_layout.addWidget(self.sound_notifications)
-
-        notification_group.setLayout(notification_layout)
-        behavior_layout.addWidget(notification_group)
-
-        # Privacy Settings
-        privacy_group = QGroupBox("Privacy")
-        privacy_layout = QVBoxLayout()
-
-        self.save_history = QCheckBox("Save Chat History")
-        self.save_history.setChecked(True)
-        privacy_layout.addWidget(self.save_history)
-
-        self.anonymous_usage = QCheckBox("Send Anonymous Usage Data")
-        privacy_layout.addWidget(self.anonymous_usage)
-
-        privacy_group.setLayout(privacy_layout)
-        behavior_layout.addWidget(privacy_group)
-
-        behavior_layout.addStretch()
-        tabs.addTab(behavior_tab, "Behavior")
 
         # Speech Settings Tab
         speech_tab = QWidget()
         speech_layout = QVBoxLayout(speech_tab)
 
-        # TTS Settings
-        tts_group = QGroupBox("Text-to-Speech")
-        tts_layout = QVBoxLayout()
+        # TTS Settings Group
+        tts_group = QGroupBox("Text-to-Speech Settings")
+        tts_group_layout = QVBoxLayout()
 
-        # TTS Engine
-        tts_engine_layout = QHBoxLayout()
-        tts_engine_label = QLabel("TTS Engine:")
-        self.tts_engine_combo = QComboBox()
-        self.tts_engine_combo.addItems(["System Default", "Coqui TTS", "pyttsx3"])
-        tts_engine_layout.addWidget(tts_engine_label)
-        tts_engine_layout.addWidget(self.tts_engine_combo)
-        tts_layout.addLayout(tts_engine_layout)
+        # TTS Engine Selection
+        engine_layout = QHBoxLayout()
+        engine_label = QLabel("TTS Engine:")
+        self.tts_engine = QComboBox()
+        self.tts_engine.addItems(["System TTS", "Coqui TTS"])
+        engine_layout.addWidget(engine_label)
+        engine_layout.addWidget(self.tts_engine)
+        tts_group_layout.addLayout(engine_layout)
 
         # Voice Selection
         voice_layout = QHBoxLayout()
         voice_label = QLabel("Voice:")
-        self.voice_combo = QComboBox()
-        self.voice_combo.addItems(["Default Voice", "Male", "Female"])
+        self.voice_select = QComboBox()
+        self.voice_select.addItems(["Default"])  # Will be populated based on engine
         voice_layout.addWidget(voice_label)
-        voice_layout.addWidget(self.voice_combo)
-        tts_layout.addLayout(voice_layout)
+        voice_layout.addWidget(self.voice_select)
+        tts_group_layout.addLayout(voice_layout)
 
-        # Speech Rate
-        rate_layout = QHBoxLayout()
-        rate_label = QLabel("Speech Rate:")
-        self.rate_slider = QSlider(Qt.Orientation.Horizontal)
-        self.rate_slider.setRange(50, 200)
-        self.rate_slider.setValue(100)
-        rate_layout.addWidget(rate_label)
-        rate_layout.addWidget(self.rate_slider)
-        tts_layout.addLayout(rate_layout)
+        # Speed Control
+        speed_layout = QHBoxLayout()
+        speed_label = QLabel("Speech Speed:")
+        self.speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self.speed_slider.setRange(50, 200)
+        self.speed_slider.setValue(100)
+        self.speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.speed_slider.setTickInterval(25)
+        speed_layout.addWidget(speed_label)
+        speed_layout.addWidget(self.speed_slider)
+        tts_group_layout.addLayout(speed_layout)
 
-        tts_group.setLayout(tts_layout)
+        tts_group.setLayout(tts_group_layout)
         speech_layout.addWidget(tts_group)
 
-        # STT Settings
-        stt_group = QGroupBox("Speech-to-Text")
-        stt_layout = QVBoxLayout()
+        # STT Settings Group
+        stt_group = QGroupBox("Speech-to-Text Settings")
+        stt_group_layout = QVBoxLayout()
 
-        # STT Engine
-        stt_engine_layout = QHBoxLayout()
-        stt_engine_label = QLabel("STT Engine:")
-        self.stt_engine_combo = QComboBox()
-        self.stt_engine_combo.addItems(["OpenAI Whisper", "System Default"])
-        stt_engine_layout.addWidget(stt_engine_label)
-        stt_engine_layout.addWidget(self.stt_engine_combo)
-        stt_layout.addLayout(stt_engine_layout)
+        # Recording Duration
+        duration_layout = QHBoxLayout()
+        duration_label = QLabel("Recording Duration (seconds):")
+        self.duration_spin = QSpinBox()
+        self.duration_spin.setRange(1, 60)
+        self.duration_spin.setValue(5)
+        duration_layout.addWidget(duration_label)
+        duration_layout.addWidget(self.duration_spin)
+        stt_group_layout.addLayout(duration_layout)
 
-        # Language
-        language_layout = QHBoxLayout()
-        language_label = QLabel("Language:")
-        self.language_combo = QComboBox()
-        self.language_combo.addItems(["English", "Spanish", "French", "German"])
-        language_layout.addWidget(language_label)
-        language_layout.addWidget(self.language_combo)
-        stt_layout.addLayout(language_layout)
+        # Auto-detect Language
+        self.auto_detect = QCheckBox("Auto-detect Language")
+        self.auto_detect.setChecked(True)
+        stt_group_layout.addWidget(self.auto_detect)
 
-        stt_group.setLayout(stt_layout)
+        # Continuous Listening
+        self.continuous = QCheckBox("Continuous Listening Mode")
+        self.continuous.setToolTip("Automatically start new recording after each transcription")
+        stt_group_layout.addWidget(self.continuous)
+
+        stt_group.setLayout(stt_group_layout)
         speech_layout.addWidget(stt_group)
 
         speech_layout.addStretch()
@@ -330,6 +283,47 @@ class SettingsDialog(QDialog):
         button_box.addWidget(ok_button)
         button_box.addWidget(cancel_button)
         layout.addLayout(button_box)
+
+        # Initialize models table
+        self.refresh_models_table()
+
+    def sync_models(self):
+        """Sync models from Ollama"""
+        try:
+            self.model_config.sync_models()
+            self.refresh_models_table()
+            QMessageBox.information(self, "Success", "Successfully synced models from Ollama!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to sync models: {str(e)}")
+
+    def refresh_models_table(self):
+        """Refresh the models table with current data"""
+        self.models_table.setRowCount(0)
+        for model_name, model_info in self.model_config.models.items():
+            details = model_info.get("details", {})
+            row = self.models_table.rowCount()
+            self.models_table.insertRow(row)
+            
+            # Model Name
+            self.models_table.setItem(row, 0, QTableWidgetItem(model_name))
+            
+            # Family
+            family = details.get("family", "").title()
+            self.models_table.setItem(row, 1, QTableWidgetItem(family))
+            
+            # Parameters
+            param_size = details.get("parameter_size", "")
+            self.models_table.setItem(row, 2, QTableWidgetItem(param_size))
+            
+            # Quantization
+            quant = details.get("quantization_level", "")
+            self.models_table.setItem(row, 3, QTableWidgetItem(quant))
+            
+            # Size
+            size_bytes = model_info.get("size", 0)
+            size_gb = size_bytes / (1024 * 1024 * 1024)  # Convert to GB
+            size_text = f"{size_gb:.2f} GB"
+            self.models_table.setItem(row, 4, QTableWidgetItem(size_text))
 
     def set_button_color(self, button: QPushButton, color: str):
         """Set the background color of a button"""
