@@ -325,6 +325,47 @@ class ChatLayout(QWidget):
     def toggle_tts(self, enabled: bool):
         """Toggle text-to-speech functionality"""
         if enabled:
+            # Check if TTS is available
+            tts_methods = self.speech_handler.get_available_tts_methods()
+            if not tts_methods:
+                QMessageBox.warning(
+                    self,
+                    "TTS Not Available",
+                    "Text-to-speech is not available. Please install required dependencies."
+                )
+                self.tts_toggle.setChecked(False)
+                return
+
+            self.speaking_indicator.setText("TTS Enabled")
+            self.stop_button.show()
+            # Test TTS with a short message using first available method
+            self.speech_handler.text_to_speech(
+                "Text-to-speech enabled", 
+                tts_methods[0],
+                callback=lambda: self.speaking_indicator.setText("TTS Ready")
+            )
+        else:
+            self.speaking_indicator.setText("")
+            self.stop_button.hide()
+            self.speech_handler.stop_speaking()
+        # Cleanup worker after successful response
+        self.cleanup_worker()
+
+    def handle_error(self, error: str):
+        """Handle error from worker thread"""
+        if not self.current_model or self.current_model not in self.chat_displays:
+            return
+
+        chat_display = self.chat_displays[self.current_model]
+        chat_display.hide_typing_indicator()
+        chat_display.add_message(f"Error: {error}", False)
+        
+        # Cleanup worker after error
+        self.cleanup_worker()
+
+    def toggle_tts(self, enabled: bool):
+        """Toggle text-to-speech functionality"""
+        if enabled:
             self.speaking_indicator.setText("TTS Enabled")
             self.stop_button.show()
             self.speech_handler.text_to_speech("Text-to-speech enabled", "pyttsx3 (System)")
