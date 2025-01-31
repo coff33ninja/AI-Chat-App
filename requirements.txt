@@ -1,16 +1,16 @@
-PyQt6>=6.4.0  
-PyQt6-tools>=6.0.0  
-PyQt6[full]  
-pyttsx3>=2.90  # Text-to-Speech (TTS) engine  
-openai-whisper>=20231117  # Speech recognition model  
-sounddevice>=0.4.6  # Audio input/output  
-numpy>=1.24.0  # Numerical computing library  
-TTS>=0.22.0  # Optional: Coqui TTS for speech synthesis  
-wave>=0.0.2  # Handling .wav audio files  
-openai>=1.0.0  # OpenAI API integration  
-requests>=2.31.0  # HTTP requests library  
-pyaudio>=0.2.13  # Audio input/output  
-scipy>=1.11.0  # Scientific computing library  
-python-dotenv>=1.0.0  # Environment variable management  
-qt-material>=2.14  # Optional: Theming for PyQt6 UI  
-regex>=2023.10.3  # Advanced regular expressions  
+PyQt6>=6.4.0
+PyQt6-tools>=6.0.0
+PyQt6[full]
+pyttsx3>=2.90  # Text-to-Speech (TTS) engine
+openai-whisper>=20231117  # Speech recognition model
+sounddevice>=0.4.6  # Audio input/output
+numpy>=1.24.0  # Numerical computing library
+TTS>=0.22.0  # Optional: Coqui TTS for speech synthesis
+wave>=0.0.2  # Handling .wav audio files
+openai>=1.0.0  # OpenAI API integration
+requests>=2.31.0  # HTTP requests library
+pyaudio>=0.2.13  # Audio input/output
+scipy>=1.11.0  # Scientific computing library
+python-dotenv>=1.0.0  # Environment variable management
+qt-material>=2.14  # Optional: Theming for PyQt6 UI
+regex>=2023.10.3  # Advanced regular expressions

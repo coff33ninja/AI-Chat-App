@@ -1,71 +1,116 @@
-import logging
-import logging.handlers
-import subprocess
 import sys
-import os
-from datetime import datetime
-from dependency_checker.dependency_checker import automated_scan, check_all_dependencies
+import logging
+from PyQt6.QtWidgets import QApplication
+from modules.main_window import MainWindow
 
-# Set up logging
-log_dir = "logs"
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
-
-log_file = os.path.join(log_dir, f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+# Configure logging with a valid datetime format
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(log_file)
-    ]
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'  # Fixed datetime format
 )
 
 logger = logging.getLogger("run_app")
 
+def check_dependencies():
+    """Check if all required dependencies are installed"""
+    logger.info("Running dependency check...")
+    
+    # List of dependencies to check
+    dependencies = {
+        "speech_module": {
+            "Python packages": {
+                "Text-to-Speech (Coqui TTS)": "TTS",
+                "Text-to-Speech (System)": "pyttsx3",
+                "Speech-to-Text (OpenAI Whisper)": "whisper",
+                "Audio recording": "sounddevice",
+                "Numerical computations": "numpy",
+                "GUI framework": "PyQt6"
+            },
+            "System dependencies": {
+                "FFmpeg audio playback": "ffplay"
+            }
+        },
+        "chat_history": {
+            "Python packages": {
+                "JSON handling": "json",
+                "Date and time handling": "datetime"
+            }
+        },
+        "model_config": {
+            "Python packages": {
+                "JSON handling": "json",
+                "Type hints": "typing"
+            }
+        },
+        "shortcut_manager": {
+            "Python packages": {
+                "GUI framework": "PyQt6"
+            }
+        },
+        "tab_manager": {
+            "Python packages": {
+                "GUI framework": "PyQt6"
+            }
+        },
+        "theme_manager": {
+            "Python packages": {
+                "GUI framework": "PyQt6",
+                "JSON handling": "json"
+            }
+        }
+    }
 
+    print("Checking dependencies...")
+    all_satisfied = True
+
+    for module, categories in dependencies.items():
+        print(f"\nChecking dependencies for {module}:")
+        
+        for category, deps in categories.items():
+            print(f"\n{category}:")
+            for dep_name, dep_package in deps.items():
+                try:
+                    if category == "Python packages":
+                        __import__(dep_package)
+                    elif category == "System dependencies":
+                        if dep_package == "ffplay":
+                            import shutil
+                            if not shutil.which("ffplay"):
+                                raise FileNotFoundError
+                    print(f"[OK] {dep_name}: {dep_package}")
+                except ImportError:
+                    print(f"[FAIL] {dep_name}: {dep_package}")
+                    all_satisfied = False
+                except FileNotFoundError:
+                    print(f"[FAIL] {dep_name}: {dep_package}")
+                    all_satisfied = False
+
+    if all_satisfied:
+        print("\n[OK] All dependencies are satisfied!")
+        logger.info("All dependencies are satisfied")
+    else:
+        print("\n[FAIL] Some dependencies are missing!")
+        logger.error("Some dependencies are missing")
+        
+    return all_satisfied
 
 def main():
-    """Main function to run the application with comprehensive dependency checking."""
-    try:
-        logger.info("Starting the application setup process...")
-        
-        # Check Python version
-        python_version = sys.version_info
-        min_version = (3, 10)
-        if python_version < min_version:
-            logger.error(f"Python {min_version[0]}.{min_version[1]} or higher is required")
-            return 1
-
-        logger.info("Running dependency check...")
-        
-        # Check and install dependencies
-        try:
-            automated_scan()
-        except Exception as e:
-            logger.error(f"Failed to run automated dependency scan: {e}")
-            return 1
-
-        if not check_all_dependencies():
-            logger.error("Required dependencies are not satisfied. Please check the logs for details.")
-            return 1
-
-        logger.info("All dependencies are satisfied. Starting the main application...")
-
-        # Run the main application
-        result = subprocess.run([sys.executable, "main.py"], capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            logger.error(f"Application exited with error: {result.stderr}")
-            return 1
-            
-        return 0
-
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-        return 1
-
-
+    """Main application entry point"""
+    logger.info("Starting the application setup process...")
+    
+    # Check dependencies
+    logger.info("Running dependency check...")
+    if not check_dependencies():
+        logger.error("Dependency check failed. Please install missing dependencies.")
+        sys.exit(1)
+    
+    # Start the application
+    logger.info("All dependencies are satisfied. Starting the main application...")
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

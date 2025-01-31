@@ -5,7 +5,22 @@
 
 version: 2
 updates:
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "pip"  # Python uses pip for dependency management
+    directory: "/"  # Root directory (change if dependencies are in a subdirectory)
     schedule:
-      interval: "weekly"
+      interval: "weekly"  # Options: daily, weekly, monthly
+    open-pull-requests-limit: 5  # Maximum number of open PRs
+    ignore:
+      - dependency-name: "numpy"  # Ignore updates for numpy
+        versions: ["1.22.0"]  # Ignore specific version(s)
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest"  # Group all pytest-related updates
+          - "black"
+      security-updates:
+        dependency-type: "development"  # Specify the dependency type
+        applies-to: security-updates  # Group security-related updates
+    commit-message:
+      prefix: "[DepBot]"  # Custom PR commit prefix
+      include: "scope"  # Includes dependency scope in commit message
