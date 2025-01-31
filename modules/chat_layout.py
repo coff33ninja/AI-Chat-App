@@ -58,7 +58,7 @@ class ChatLayout(QWidget):
         welcome_label = QLabel("👋 Welcome to AI Chat!")
         welcome_label.setStyleSheet("""
             QLabel {
-                color: #666666;
+                color: #000000;
                 font-size: 24px;
                 font-weight: bold;
             }
@@ -68,7 +68,7 @@ class ChatLayout(QWidget):
         instruction_label = QLabel("Select an AI model from the sidebar to start chatting")
         instruction_label.setStyleSheet("""
             QLabel {
-                color: #666666;
+                color: #000000;
                 font-size: 16px;
             }
         """)
@@ -99,9 +99,13 @@ class ChatLayout(QWidget):
                 padding: 8px 16px;
                 background-color: white;
                 min-height: 24px;
+                color: #000000;
             }
             QLineEdit:focus {
                 border: 1px solid #128C7E;
+            }
+            QLineEdit::placeholder {
+                color: #666666;
             }
         """)
         self.input_field.returnPressed.connect(self.send_message)
@@ -116,6 +120,7 @@ class ChatLayout(QWidget):
                 border-radius: 15px;
                 padding: 8px 16px;
                 min-width: 70px;
+                font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #075E54;

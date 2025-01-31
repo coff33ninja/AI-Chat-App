@@ -37,18 +37,19 @@ class ThemeManager:
         else:
             # Light theme colors
             palette.setColor(QPalette.ColorRole.Window, QColor(240, 240, 240))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(50, 50, 50))
             palette.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.white)
             palette.setColor(QPalette.ColorRole.AlternateBase, QColor(233, 231, 227))
             palette.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.black)
-            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.black)
+            palette.setColor(QPalette.ColorRole.ToolTipText, QColor(50, 50, 50))
+            palette.setColor(QPalette.ColorRole.Text, QColor(50, 50, 50))
             palette.setColor(QPalette.ColorRole.Button, QColor(240, 240, 240))
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.black)
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor(50, 50, 50))
             palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
             palette.setColor(QPalette.ColorRole.Link, QColor(0, 0, 255))
             palette.setColor(QPalette.ColorRole.Highlight, QColor(0, 120, 215))
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
             palette.setColor(QPalette.ColorRole.PlaceholderText, QColor(127, 127, 127))
+
 
         app.setPalette(palette)

@@ -41,7 +41,7 @@ class MessageBubble(QFrame):
 
         # Timestamp
         time_label = QLabel(timestamp.strftime("%I:%M %p"))
-        time_label.setStyleSheet("color: #666666; font-size: 10px;")
+        time_label.setStyleSheet("color: #444444; font-size: 10px;")
         time_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         message_layout.addWidget(time_label)
 
@@ -66,7 +66,7 @@ class MessageBubble(QFrame):
         padding = "4px" if self.compact_mode else "8px"
         frame.setStyleSheet(f"""
             #userBubble {{
-                background-color: #DCF8C6;
+                background-color: #C0C0C0;
                 border-radius: {8 if self.compact_mode else 10}px;
                 padding: {padding};
             }}
@@ -75,7 +75,7 @@ class MessageBubble(QFrame):
                 font-size: {11 if self.compact_mode else 12}px;
             }}
             #aiBubble {{
-                background-color: #FFFFFF;
+                background-color: #E8E8E8;
                 border-radius: {8 if self.compact_mode else 10}px;
                 padding: {padding};
             }}
@@ -133,7 +133,7 @@ class TypingIndicator(QFrame):
         """Update indicator style based on compact mode"""
         self.setStyleSheet(f"""
             #typingIndicator {{
-                background-color: #FFFFFF;
+                background-color: #E0E0E0;
                 border-radius: {8 if self.compact_mode else 10}px;
                 padding: {4 if self.compact_mode else 8}px;
                 margin: {2 if self.compact_mode else 5}px;
@@ -153,7 +153,7 @@ class TypingIndicator(QFrame):
     def getDotStyle(self):
         """Get dot style based on compact mode"""
         size = "20px" if self.compact_mode else "24px"
-        return f"color: #666666; font-size: {size};"
+        return f"color: #444444; font-size: {size};"
 
     def setCompactMode(self, compact: bool):
         """Toggle compact mode"""
@@ -167,7 +167,7 @@ class TypingIndicator(QFrame):
     def animate_dots(self):
         base_sizes = [24, 20, 16] if not self.compact_mode else [20, 16, 12]
         styles = [
-            f"color: #666666; font-size: {size}px;"
+            f"color: #444444; font-size: {size}px;"
             for size in base_sizes
         ]
 
@@ -224,7 +224,7 @@ class ChatDisplay(QScrollArea):
                 margin: 0px;
             }}
             QScrollBar::handle:vertical {{
-                background: #CCCCCC;
+                background: #AAAAAA;
                 min-height: 20px;
                 border-radius: {4 if self.compact_mode else 5}px;
             }}
@@ -335,7 +335,7 @@ class ChatDisplay(QScrollArea):
     def export_chat(self, format: str = "txt") -> str:
         """Export chat in the specified format"""
         messages = self.get_messages()
-        
+
         if format == "json":
             chat_data = {
                 "name": self.chat_name,
