@@ -1,0 +1,34 @@
+{
+    "project": {
+        "name": "AI-Chat-App",
+        "main_script": "",
+        "requirements_file": "requirements.txt"
+    },
+    "environment": {
+        "use_venv": true,
+        "venv_path": "venv",
+        "python_path": "",
+        "system_dependencies": {
+            "ffmpeg": {
+                "required": true,
+                "version": ""
+            }
+        }
+    },
+    "dependencies": {
+        "check_on_startup": true,
+        "auto_install": false,
+        "requirements_file": "../requirements.txt",
+        "categories": {
+            "core": true,
+            "speech": true,
+            "optional": false
+        }
+    },
+    "launcher": {
+        "selected_app": "",
+        "working_directory": "..",
+        "environment_vars": {},
+        "verify_imports": true
+    }
+}
