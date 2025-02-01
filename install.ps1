@@ -34,7 +34,7 @@ if (-not (Test-Command winget)) {
     Write-Host "Installing winget using Chocolatey..." -ForegroundColor Yellow
     choco install -y winget-cli
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
-    
+
     # Verify winget installation
     if (-not (Test-Command winget)) {
         Write-Error "Failed to install winget. Please install manually from the Microsoft Store."
@@ -137,7 +137,7 @@ Write-Host "Creating desktop shortcut..." -ForegroundColor Green
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\AI-Chat-App.lnk")
 $Shortcut.TargetPath = "$PWD\.venv\Scripts\python.exe"
-$Shortcut.Arguments = "$PWD\main.py"
+$Shortcut.Arguments = "$PWD\run_app.py"
 $Shortcut.WorkingDirectory = "$PWD\.venv\Scripts"
 $Shortcut.Save()
 Write-Host "Desktop shortcut created successfully!" -ForegroundColor Green
@@ -145,3 +145,5 @@ Write-Host "Desktop shortcut created successfully!" -ForegroundColor Green
 Start-Process powershell.exe -ArgumentList "-NoExit -ExecutionPolicy Bypass -File `"$postInstallPath`"" -Wait
 
 Write-Host "Setup complete! The application should now be running in a new window." -ForegroundColor Green
+Write-Host "Press any key to exit..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
