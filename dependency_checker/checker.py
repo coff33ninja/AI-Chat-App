@@ -1,4 +1,5 @@
 import sys
+import platform
 import subprocess
 import importlib.util
 import shutil
@@ -11,16 +12,18 @@ logger = get_module_logger(__name__)
 
 class ModuleChecker:
     """Class to check dependencies for a specific module"""
-    
-    def __init__(self, module_name: str, required_packages: Dict[str, str], 
+
+    def __init__(self, module_name: str, required_packages: Dict[str, str],
                  system_commands: Optional[List[str]] = None,
                  additional_instructions: Optional[Dict[str, str]] = None):
         self.module_name = module_name
         self.required_packages = required_packages
         self.system_commands = system_commands or []
         self.additional_instructions = additional_instructions or {}
+        self.missing_dependencies = []
+        self.installation_instructions = []
         logger.info(f"Initializing dependency checker for {module_name}")
-        
+
     def check_module(self, module_name: str) -> bool:
         """Check if a Python module is installed"""
         try:
@@ -33,7 +36,7 @@ class ModuleChecker:
         except Exception as e:
             logger.error(f"Error checking module {module_name}: {str(e)}")
             return False
-        
+
     def check_command(self, command: str) -> bool:
         """Check if a command is available in PATH"""
         try:
@@ -45,12 +48,12 @@ class ModuleChecker:
         except Exception as e:
             logger.error(f"Error checking command {command}: {str(e)}")
             return False
-        
+
     def check(self) -> bool:
         """Check all dependencies for this module"""
         print(f"\nChecking dependencies for {self.module_name}:")
         all_ok = True
-        
+
         # Check Python packages
         print("\nRequired Python packages:")
         for package, description in self.required_packages.items():
@@ -60,7 +63,7 @@ class ModuleChecker:
                 print(f"To install: pip install {package}")
                 if package in self.additional_instructions:
                     print(self.additional_instructions[package])
-        
+
         # Check system commands
         if self.system_commands:
             print("\nRequired system commands:")
@@ -69,8 +72,41 @@ class ModuleChecker:
                     all_ok = False
                     if command in self.additional_instructions:
                         print(self.additional_instructions[command])
-        
+
         return all_ok
+
+
+    def check_system_dependencies(self):
+        """Check system-level dependencies"""
+        if platform.system() == "Windows":
+            # Check for Visual C++ Redistributable
+            try:
+                import ctypes
+
+                ctypes.CDLL("vcruntime140.dll")
+                logger.info("Microsoft Visual C++ Redistributable is installed")
+            except OSError:
+                logger.warning("Microsoft Visual C++ Redistributable is missing")
+                self.missing_dependencies.append("Microsoft Visual C++ Redistributable")
+                # Provide installation instructions
+                self.installation_instructions.append(
+                    "Please install Microsoft Visual C++ Redistributable from: "
+                    "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+                )
+        else:
+            # Check for ffmpeg
+            try:
+                subprocess.run(["ffplay", "-version"], check=True)
+                logger.info("ffmpeg is installed")
+            except subprocess.CalledProcessError:
+                logger.warning("ffmpeg is missing")
+                self.missing_dependencies.append("ffmpeg")
+                # Provide installation instructions
+                self.installation_instructions.append(
+                    "Please install ffmpeg from: https://ffmpeg.org/download.html"
+                    )
+                return self.missing_dependencies, self.installation_instructions
+
 
 def check_all_dependencies() -> bool:
     """Check dependencies for all modules"""
@@ -92,7 +128,7 @@ def check_all_dependencies() -> bool:
                 'ffplay': 'Download FFmpeg from: https://ffmpeg.org/download.html\nMake sure to add it to your system PATH'
             }
         ),
-        
+
         # GUI Dependencies
         ModuleChecker(
             "gui",
@@ -100,7 +136,7 @@ def check_all_dependencies() -> bool:
                 'PyQt6': 'GUI framework'
             }
         ),
-        
+
         # Model Config Dependencies
         ModuleChecker(
             "model_config",
@@ -109,7 +145,7 @@ def check_all_dependencies() -> bool:
                 'typing': 'Type hints'
             }
         ),
-        
+
         # Logger Dependencies
         ModuleChecker(
             "logger_config",
@@ -117,7 +153,7 @@ def check_all_dependencies() -> bool:
                 'logging': 'Logging framework'
             }
         ),
-        
+
         # Theme Manager Dependencies
         ModuleChecker(
             "theme_manager",
@@ -126,7 +162,7 @@ def check_all_dependencies() -> bool:
                 'json': 'JSON handling'
             }
         ),
-        
+
         # Tab Manager Dependencies
         ModuleChecker(
             "tab_manager",
@@ -134,7 +170,7 @@ def check_all_dependencies() -> bool:
                 'PyQt6': 'GUI framework'
             }
         ),
-        
+
         # Shortcut Manager Dependencies
         ModuleChecker(
             "shortcut_manager",
@@ -143,17 +179,17 @@ def check_all_dependencies() -> bool:
             }
         )
     ]
-    
+
     all_ok = True
     for checker in checkers:
         if not checker.check():
             all_ok = False
-    
+
     if all_ok:
         print("\n✅ All dependencies are installed!")
     else:
         print("\n❌ Some dependencies are missing. Please install them and try again.")
-    
+
     return all_ok
 
 def main():

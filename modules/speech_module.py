@@ -73,14 +73,20 @@ except ImportError:
     logger.warning("System TTS (pyttsx3) not available")
 
 try:
+    import platform
+    if platform.system() == 'Windows':
+        import ctypes
+        import ctypes.util
+        # Ensure msvcrt is loaded on Windows
+        ctypes.CDLL('msvcrt')
     import whisper  # Using the openai-whisper package
     import sounddevice as sd
     WHISPER_MODEL = None
     STT_AVAILABLE = True
     logger.info("Speech-to-Text (Whisper) available")
-except ImportError:
+except ImportError as e:
     STT_AVAILABLE = False
-    logger.warning("Speech-to-Text (Whisper) not available")
+    logger.warning(f"Speech-to-Text (Whisper) not available: {str(e)}")
 
 
 class SpeechHandler:

@@ -1,26 +1,41 @@
 {
     "speech_module": {
-        "packages": {
+        "packages": {},
+        "commands": {
+            "ffplay": "FFmpeg audio playback"
+        },
+        "required": {
             "TTS": "Text-to-Speech (Coqui TTS)",
             "pyttsx3": "Text-to-Speech (System)",
             "whisper": "Speech-to-Text (OpenAI Whisper)",
             "sounddevice": "Audio recording",
             "numpy": "Numerical computations",
-            "PyQt6": "GUI framework"
+            "PyQt6": "GUI framework",
+            "pyaudio": "Audio processing",
+            "soundfile": "Reads and writes audio files",
+            "wave": "Handles WAV audio files",
+            "vosk": "Offline Speech Recognition",
+            "pygame": "Alternative audio playback and handling",
+            "openai-whisper": "OpenAI Whisper STT"
         },
-        "commands": {
-            "ffplay": "FFmpeg audio playback"
+        "optional": [],
+        "system_dependencies": {
+            "windows": [
+                "Microsoft Visual C++ Redistributable"
+            ]
         }
     },
     "chat_history": {
         "packages": {
             "json": "JSON handling",
+            "orjson": "Fast JSON parsing",
             "datetime": "Date and time handling"
         }
     },
     "model_config": {
         "packages": {
             "json": "JSON handling",
+            "orjson": "Fast JSON parsing",
             "typing": "Type hints"
         }
     },
@@ -37,7 +52,14 @@
     "theme_manager": {
         "packages": {
             "PyQt6": "GUI framework",
-            "json": "JSON handling"
+            "json": "JSON handling",
+            "qt-material": "Modern Qt themes"
+        }
+    },
+    "system_utilities": {
+        "packages": {
+            "psutil": "System and process monitoring",
+            "pycaw": "Windows Audio Control"
         }
     }
 }
