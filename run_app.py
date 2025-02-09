@@ -130,8 +130,9 @@ def main():
         app = QApplication(sys.argv)
 
         # Enable High DPI scaling
-        # app.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-        # app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+        QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+        if hasattr(Qt.ApplicationAttribute, 'AA_UseHighDpiPixmaps'):
+            app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
 
         # Check dependencies
         logger.info("Running dependency check...")

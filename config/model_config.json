@@ -3,6 +3,7 @@
         "name": "llama2",
         "description": "Llama 2 is a state-of-the-art large language model.",
         "context_length": 4096,
+        "memory_required": 10.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
@@ -14,6 +15,7 @@
         "name": "mistral",
         "description": "Mistral is an efficient and powerful language model.",
         "context_length": 8192,
+        "memory_required": 4.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
@@ -23,68 +25,62 @@
     },
     "mistral:latest": {
         "name": "mistral:latest",
-        "description": "No description available",
-        "context_length": 4096,
+        "description": "Ollama model mistral:latest",
+        "memory_required": 0.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
-            "top_k": 40,
-            "repeat_penalty": 1.1
+            "max_tokens": 1000
         }
     },
     "deepseek-r1:latest": {
         "name": "deepseek-r1:latest",
-        "description": "No description available",
-        "context_length": 4096,
+        "description": "Ollama model deepseek-r1:latest",
+        "memory_required": 0.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
-            "top_k": 40,
-            "repeat_penalty": 1.1
+            "max_tokens": 1000
         }
     },
     "deepseek-coder:latest": {
         "name": "deepseek-coder:latest",
-        "description": "No description available",
-        "context_length": 4096,
+        "description": "Ollama model deepseek-coder:latest",
+        "memory_required": 0.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
-            "top_k": 40,
-            "repeat_penalty": 1.1
+            "max_tokens": 1000
         }
     },
     "codegemma:2b": {
         "name": "codegemma:2b",
-        "description": "No description available",
-        "context_length": 4096,
+        "description": "Ollama model codegemma:2b",
+        "memory_required": 1389496506255.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
-            "top_k": 40,
-            "repeat_penalty": 1.1
+            "max_tokens": 1000
         }
     },
     "gemma:2b": {
         "name": "gemma:2b",
-        "description": "No description available",
-        "context_length": 4096,
+        "description": "Ollama model gemma:2b",
+        "memory_required": 0.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
-            "top_k": 40,
-            "repeat_penalty": 1.1
+            "max_tokens": 1000
         }
     },
     "deepseek-coder-v2:latest": {
         "name": "deepseek-coder-v2:latest",
-        "description": "Model deepseek-coder-v2:latest",
-        "context_length": 4096,
+        "description": "Ollama model deepseek-coder-v2:latest",
+        "memory_required": 0.0,
         "parameters": {
             "temperature": 0.7,
             "top_p": 0.95,
-            "top_k": 40,
-            "repeat_penalty": 1.1
+            "max_tokens": 1000
         }
     }
 }
