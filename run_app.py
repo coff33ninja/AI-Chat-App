@@ -84,14 +84,14 @@ def check_dependencies():
         }
     }
 
-    print("Checking dependencies...")
+    logger.info("Checking dependencies...")
     missing_deps = []
 
     for module, categories in dependencies.items():
-        print(f"\nChecking dependencies for {module}:")
+        logger.info(f"\nChecking dependencies for {module}:")
 
         for category, deps in categories.items():
-            print(f"\n{category}:")
+            logger.info(f"\n{category}:")
             for dep_name, dep_package in deps.items():
                 try:
                     if category == "Python packages":
@@ -101,22 +101,20 @@ def check_dependencies():
                             import shutil
                             if not shutil.which("ffplay"):
                                 raise FileNotFoundError
-                    print(f"[OK] {dep_name}: {dep_package}")
+                    logger.info(f"[OK] {dep_name}: {dep_package}")
                 except ImportError:
-                    print(f"[FAIL] {dep_name}: {dep_package}")
+                    logger.error(f"[FAIL] {dep_name}: {dep_package}")
                     missing_deps.append(f"{dep_name} ({dep_package})")
                 except FileNotFoundError:
-                    print(f"[FAIL] {dep_name}: {dep_package}")
+                    logger.error(f"[FAIL] {dep_name}: {dep_package}")
                     missing_deps.append(f"{dep_name} ({dep_package})")
 
     if not missing_deps:
-        print("\n[OK] All dependencies are satisfied!")
-        logger.info("All dependencies are satisfied")
+        logger.info("\n[OK] All dependencies are satisfied!")
         return True
     else:
         error_msg = "The following dependencies are missing:\n- " + "\n- ".join(missing_deps)
-        print(f"\n[FAIL] {error_msg}")
-        logger.error(error_msg)
+        logger.error(f"\n[FAIL] {error_msg}")
         show_error_dialog("Missing Dependencies", error_msg)
         return False
 
